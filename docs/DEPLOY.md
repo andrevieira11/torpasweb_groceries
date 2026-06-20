@@ -61,9 +61,33 @@ openssl rand -hex 24   # POSTGRES_PASSWORD
 
 ### Caddy
 
-Put `ops/Caddyfile`'s block into your host Caddy config and reload. Caddy
-fetches TLS automatically and forwards `X-Forwarded-*`, so Better Auth marks
-cookies `Secure`. Point `reverse_proxy` at `localhost:${APP_PORT}`.
+Add a site block proxying the domain to the app's published port, and **disable
+HTTP/3** globally (see below). Caddy fetches TLS automatically and forwards
+`X-Forwarded-*`, so Better Auth marks cookies `Secure`.
+
+```caddyfile
+{
+	# If you already have a global block (email, etc.), MERGE into it — Caddy
+	# allows only ONE global block and it must be first. Do not add a second.
+	email you@example.com
+	servers {
+		protocols h1 h2
+	}
+}
+
+mrlist.torpasweb.com {
+	encode zstd gzip
+	reverse_proxy 192.168.1.235:3002   # the app host:APP_PORT
+}
+```
+
+**Why disable HTTP/3:** Caddy advertises `Alt-Svc: h3` by default. iOS (incl.
+Siri Shortcuts) then commits to QUIC over **UDP/443** — and if your router only
+forwards TCP/443, that POST dies with "could not connect to the server" while
+browsers silently fall back to TCP. Forcing `protocols h1 h2` fixes it. The
+alternative is to forward **UDP/443** to the app host and keep h3.
+
+Validate before reloading: `caddy validate --config /path/Caddyfile`.
 
 ## 3. Updating
 

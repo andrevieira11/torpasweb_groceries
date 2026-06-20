@@ -14,6 +14,7 @@ export type IngestResult = {
   recipe?: string;
   added: number;
   merged: number;
+  names: string[];
 };
 
 /**
@@ -51,12 +52,12 @@ export async function ingestText(opts: {
         addedByUserId,
         addedByName,
       );
-      return { kind: "recipe", recipe: hit.name, ...res };
+      return { kind: "recipe", recipe: hit.name, ...res, names: ings.map((g) => g.name) };
     }
   }
 
   const parsed = parseInput(text).slice(0, MAX_ITEMS);
-  if (parsed.length === 0) return { kind: "items", added: 0, merged: 0 };
+  if (parsed.length === 0) return { kind: "items", added: 0, merged: 0, names: [] };
 
   const rules = await db
     .select()
@@ -76,5 +77,5 @@ export async function ingestText(opts: {
     addedByUserId,
     addedByName,
   );
-  return { kind: "items", ...res };
+  return { kind: "items", ...res, names: parsed.map((p) => p.name) };
 }

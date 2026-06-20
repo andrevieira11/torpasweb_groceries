@@ -76,7 +76,28 @@ export async function POST(request: Request) {
     addedByName: "Siri",
   });
 
-  return Response.json({ ok: true, ...result });
+  return Response.json({ ok: true, message: spokenMessage(result), ...result });
+}
+
+/** A short sentence the Shortcut can read back, e.g. "Added onions, milk and eggs". */
+function spokenMessage(r: {
+  kind: string;
+  recipe?: string;
+  added: number;
+  merged: number;
+  names: string[];
+}): string {
+  if (r.names.length === 0) return "Nothing to add";
+  if (r.kind === "recipe") {
+    const n = r.added + r.merged;
+    return `Added ${r.recipe}: ${n} ingredient${n === 1 ? "" : "s"}`;
+  }
+  const names = r.names;
+  if (names.length === 1) return `Added ${names[0]}`;
+  if (names.length <= 3) {
+    return `Added ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  }
+  return `Added ${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
 }
 
 export function GET() {
