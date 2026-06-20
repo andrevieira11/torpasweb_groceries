@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/session";
 import { TabBar } from "@/components/TabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SignOutButton } from "@/components/SignOutButton";
+import { MotionProvider } from "@/components/MotionProvider";
 
 export default async function AppLayout({
   children,
@@ -22,7 +23,9 @@ export default async function AppLayout({
         </div>
       </header>
 
-      <main className="flex-1 px-4 pb-28 pt-3">{children}</main>
+      <main className="flex-1 px-4 pb-28 pt-3">
+        <MotionProvider>{children}</MotionProvider>
+      </main>
 
       <TabBar />
     </div>

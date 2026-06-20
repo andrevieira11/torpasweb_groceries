@@ -2,6 +2,27 @@
 
 Running log of non-obvious choices. Newest first.
 
+## M1 — Parser, categorizer, list
+
+- **Item identity = normalized name**: accent-fold + lowercase + strip punctuation + a light
+  bilingual singularizer (irregular map for the cases generic rules break, e.g. EN potato/tomato vs
+  PT limões→limão). Plural and singular collapse to one key so merge/categorize/learn are stable.
+- **PT decimal comma vs comma-separator** (caught in a real-DB smoke): "0,5 L leite" was splitting
+  into "0" and "5 L leite". Fix: protect `\d,\d` → `\d.\d` before comma-splitting in `parseInput`.
+- **cuid2 ids are application-side** (`$defaultFn` in the Drizzle schema), not DB defaults. The app
+  always inserts through Drizzle, so ids are generated; any raw-SQL insert must supply its own id
+  (the seed only touches `categories`, whose PK is a stable string).
+- **Merge-on-add**: a new item with the same normalized name as an existing *unchecked* one merges
+  when units are compatible (sums; rolls up g→kg, ml→l), else a separate line. Same `quantity.ts`
+  powers the M2 recipe merge. Never silently drops a quantity.
+- **Learned rules belong to the list owner** (the list's memory), unique on
+  `(owner_id, normalized_name)`, and override the dictionary. A manual category move teaches the rule.
+- **Server actions** are zod-validated and tenant-scoped through `getAccessibleList` (owner or
+  member); add is capped at 50 items.
+- **Tests** run via `node --import tsx --test`; `*.test.ts` is excluded from tsconfig so `next build`
+  doesn't type-check them. 24 pure-logic tests cover normalize, units/quantity-merge, categorize,
+  and the parser.
+
 ## M0 — Scaffold, design system, schema, auth, shell
 
 - **Next.js 16.2.9 / React 19.2.4.** `create-next-app` pinned these. Turbopack is the **default**
