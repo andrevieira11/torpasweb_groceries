@@ -1,9 +1,19 @@
 # Host Caddy snippet for MrList. Caddy terminates TLS (auto Let's Encrypt) and
-# proxies to the app container's published port (APP_PORT in .env, default 3000).
-# Caddy sets X-Forwarded-Proto/Host/For by default, which Next + Better Auth use
-# to derive the canonical https origin (so cookies are marked Secure).
+# proxies to the app container's published port (APP_PORT in .env).
+#
+# HTTP/3 is disabled on purpose: after the first response advertises `Alt-Svc:
+# h3`, iOS switches to QUIC (UDP/443), and iOS Shortcuts' POST over QUIC fails
+# with "The network connection was lost" on networks where QUIC is flaky/blocked
+# (Safari falls back to h2, Shortcuts doesn't). Keeping clients on h1/h2 fixes the
+# Siri webhook. Caddy still sets X-Forwarded-* so Better Auth marks cookies Secure.
 
-list.torpasweb.com {
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+mrlist.torpasweb.com {
 	encode zstd gzip
-	reverse_proxy localhost:3000
+	reverse_proxy localhost:3002
 }
