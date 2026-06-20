@@ -4,16 +4,11 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { categorizeRules, items, recipeIngredients } from "@/db/schema";
+import { categorizeRules, items } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { getAccessibleList } from "@/lib/queries/lists";
-import { getRecipeRefs } from "@/lib/queries/recipes";
-import { parseInput, categorize, stripCommandPrefix } from "@/lib/parse";
-import { matchRecipe } from "@/lib/recipes/match";
-import { applyItems } from "@/lib/items/add";
+import { ingestText } from "@/lib/items/ingest";
 import { CATEGORY_KEYS } from "@/lib/categories";
-
-const MAX_ITEMS_PER_ADD = 50;
 
 async function requireUser() {
   const session = await getSession();
@@ -35,8 +30,9 @@ const addSchema = z.object({
 });
 
 /**
- * Free-text add. A single phrase matching a saved recipe expands it; otherwise
- * the text is parsed into items, categorized (with learned rules), and merged.
+ * Free-text add to a list the caller can access. Recipe detection, parsing,
+ * categorizing and merging all live in the shared ingestText() core (also used
+ * by the Siri webhook).
  */
 export async function addItems(input: z.infer<typeof addSchema>) {
   const { listId, text } = addSchema.parse(input);
@@ -44,52 +40,9 @@ export async function addItems(input: z.infer<typeof addSchema>) {
   const list = await getAccessibleList(user.id, listId);
   if (!list) throw new Error("List not found");
 
-  const phrase = stripCommandPrefix(text.trim());
-  if (phrase && !/[,\n;]/.test(phrase)) {
-    const hit = matchRecipe(phrase, await getRecipeRefs(list.ownerId));
-    if (hit) {
-      const ings = await db
-        .select()
-        .from(recipeIngredients)
-        .where(eq(recipeIngredients.recipeId, hit.id));
-      const res = await applyItems(
-        listId,
-        ings.map((g) => ({
-          name: g.name,
-          normalizedName: g.normalizedName,
-          qty: g.qty,
-          unit: g.unit,
-          categoryKey: g.categoryKey,
-        })),
-        user.id,
-      );
-      revalidatePath("/");
-      return { kind: "recipe" as const, recipe: hit.name, ...res };
-    }
-  }
-
-  const parsed = parseInput(text).slice(0, MAX_ITEMS_PER_ADD);
-  if (parsed.length === 0) return { kind: "items" as const, added: 0, merged: 0 };
-
-  const rules = await db
-    .select()
-    .from(categorizeRules)
-    .where(eq(categorizeRules.ownerId, list.ownerId));
-  const learned = new Map(rules.map((r) => [r.normalizedName, r.categoryKey]));
-
-  const res = await applyItems(
-    listId,
-    parsed.map((p) => ({
-      name: p.name,
-      normalizedName: p.normalizedName,
-      qty: p.qty,
-      unit: p.unit,
-      categoryKey: categorize(p.name, learned),
-    })),
-    user.id,
-  );
+  const result = await ingestText({ list, text, addedByUserId: user.id });
   revalidatePath("/");
-  return { kind: "items" as const, ...res };
+  return result;
 }
 
 export async function toggleItem(input: { itemId: string }) {

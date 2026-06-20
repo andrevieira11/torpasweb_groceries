@@ -2,6 +2,21 @@
 
 Running log of non-obvious choices. Newest first.
 
+## M4 — Siri ingest webhook
+
+- **One shared `ingestText` core** (`src/lib/items/ingest.ts`) does recipe-detect → parse →
+  categorize → `applyItems`. Both the in-app `addItems` action and the webhook call it; `addItems`
+  is now just a session + access wrapper. No parser logic is duplicated.
+- **`POST /api/ingest`**: bearer token compared **constant-time** against `INGEST_WEBHOOK_TOKEN`;
+  per-IP rate limit (60/min); body capped at 2 KB (declared `content-length` *and* actual length).
+  Accepts JSON `{"text":"..."}` or `text/plain`. Targets the **earliest default list** (single owner
+  for now), attributing items to "Siri". Returns `503` if the token isn't configured. `runtime` is
+  pinned to `nodejs` (needs `node:crypto` + postgres-js).
+- **Verified over HTTP**: 401 on missing/wrong token, item add with categorization, and `"add
+  <recipe>"` expansion all work through the webhook.
+- `docs/SIRI.md` documents the iPhone/HomePod Shortcut (Dictate → Get Contents of URL → POST), and
+  is honest that zero-tap native Siri needs a native app — this Shortcut path is the realistic one.
+
 ## M3 — Sharing, guests, temporary lists
 
 - **Active list via an httpOnly cookie** (`mrlist_active`), validated against access + liveness on

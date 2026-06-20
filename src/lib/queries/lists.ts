@@ -87,6 +87,20 @@ export async function getActiveList(userId: string) {
   return getOrCreateDefaultList(userId);
 }
 
+/**
+ * The list the Siri webhook adds to: the earliest-created default list (single
+ * owner now). Returns null if no list exists yet.
+ */
+export async function getIngestTargetList() {
+  const [list] = await db
+    .select()
+    .from(lists)
+    .where(and(eq(lists.isDefault, true), isNull(lists.archivedAt)))
+    .orderBy(asc(lists.createdAt))
+    .limit(1);
+  return list ?? null;
+}
+
 /** All items in a list, unchecked first, then by insertion order. */
 export async function getListItems(listId: string) {
   return db
