@@ -69,6 +69,9 @@ export const listShareTokens = pgTable(
       .notNull()
       .references(() => lists.id, { onDelete: "cascade" }),
     token: text("token").notNull().unique(),
+    kind: text("kind", { enum: ["guest", "member_invite"] })
+      .notNull()
+      .default("guest"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),

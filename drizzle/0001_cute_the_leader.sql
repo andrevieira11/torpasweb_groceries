@@ -1,0 +1,1 @@
+ALTER TABLE "list_share_tokens" ADD COLUMN "kind" text DEFAULT 'guest' NOT NULL;

@@ -31,7 +31,8 @@ export default function SignInPage() {
       return;
     }
 
-    router.replace("/");
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.replace(next && next.startsWith("/") ? next : "/");
     router.refresh();
   }
 

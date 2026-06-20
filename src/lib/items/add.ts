@@ -13,6 +13,7 @@ export async function applyItems(
   listId: string,
   incoming: IncomingItem[],
   addedByUserId: string | null,
+  addedByName: string | null = null,
 ) {
   if (incoming.length === 0) return { added: 0, merged: 0 };
 
@@ -45,6 +46,7 @@ export async function applyItems(
         unit: i.unit,
         categoryKey: i.categoryKey,
         addedByUserId,
+        addedByName,
       })),
     );
   }

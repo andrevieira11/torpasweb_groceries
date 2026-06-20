@@ -2,6 +2,28 @@
 
 Running log of non-obvious choices. Newest first.
 
+## M3 — Sharing, guests, temporary lists
+
+- **Active list via an httpOnly cookie** (`mrlist_active`), validated against access + liveness on
+  every read, falling back to the default list. Every list gets an owner `list_members` row on
+  creation, so `getUserLists` is a single membership→lists join.
+- **One share-token table, two kinds** (`guest` / `member_invite`) via a `kind` column (migration
+  0001). Tokens are 192-bit `base64url`. `resolveToken` is the **single trusted gate** — it checks
+  kind, not-revoked, token-expiry, and list not archived/expired in one place; a token is reused per
+  `(list, kind)` until revoked.
+- **Guest = least privilege.** Guest actions take the **token** and derive the list from it — never a
+  client-supplied list id. Guests can **add + check only** (no move/delete/clear); toggle verifies
+  `item.listId === token's list`. Writes are rate-limited (30/min/token) and body-capped (≤500 chars,
+  ≤20 items). Items are stamped with `addedByName`, no account. The guest page sends the client only
+  item display data — never `ownerId` or other lists. Verified over HTTP (valid renders; unknown +
+  revoked → invalid).
+- **Member invite**: `/join/[token]` → if logged out, bounce to `/sign-in?next=/join/<token>` and back
+  (the `next` redirect is guarded to same-origin paths to avoid open redirects) → join as member.
+- **Temporary lists**: optional `expiresAt`; `isLive()` filters archived/expired on read; expiry shown
+  relative via date-fns. Owner can't leave (delete instead); the default list can't be deleted.
+- **Guest name** is prefilled by writing the input's DOM value in an effect (not React state), to
+  satisfy the `set-state-in-effect` lint rule while still reading `localStorage` client-only.
+
 ## M2 — Recipes + "add &lt;recipe&gt;" expansion
 
 - **Recipes are per-owner.** CRUD via server actions; on edit the ingredients are replaced
