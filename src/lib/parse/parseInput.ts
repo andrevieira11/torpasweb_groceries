@@ -81,7 +81,7 @@ function parseSegment(raw: string): ParsedItem | null {
   return { name, normalizedName: normalizeName(name), qty, unit, raw: seg };
 }
 
-function stripCommandPrefix(input: string): string {
+export function stripCommandPrefix(input: string): string {
   const s = input.trim();
   const folded = accentFold(s.toLowerCase());
   for (const p of COMMAND_PREFIXES) {

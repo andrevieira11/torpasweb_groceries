@@ -2,6 +2,22 @@
 
 Running log of non-obvious choices. Newest first.
 
+## M2 — Recipes + "add &lt;recipe&gt;" expansion
+
+- **Recipes are per-owner.** CRUD via server actions; on edit the ingredients are replaced
+  wholesale (delete + re-insert) — simplest correct semantics for an editor.
+- **"add &lt;recipe&gt;" detection** lives in `addItems`: only a single phrase (no `,`/`;`/newline)
+  is considered, and it must match a saved recipe **exactly (normalized) or by Levenshtein ratio
+  ≥ 0.85** (min length 3). Conservative on purpose — "milk" must not expand a recipe.
+- **One merge path.** Both free-text add and recipe expansion build `IncomingItem[]` and go through
+  `applyItems` → `planMerge` (pure, tested). Compatible quantities fold into existing *unchecked*
+  rows; within-batch duplicates merge too. Verified on real Postgres (leite 5 l + 0.5 l → 5.5 l).
+- **The recipe editor reuses the parser**: typing "2kg flour, 3 eggs, salt" runs `parseInput` +
+  `categorize` client-side to pre-fill editable ingredient rows.
+- **tsx caveats** (tests/smokes only, not the app): tsx's ESM loader doesn't resolve barrel
+  `export *` named imports or the Next-provided `server-only` shim, so tests and smoke scripts import
+  concrete modules (e.g. `@/db/schema/app`) and avoid `server-only` files.
+
 ## M1 — Parser, categorizer, list
 
 - **Item identity = normalized name**: accent-fold + lowercase + strip punctuation + a light

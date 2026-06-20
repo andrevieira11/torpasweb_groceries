@@ -4,11 +4,13 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { categorizeRules, items } from "@/db/schema";
+import { categorizeRules, items, recipeIngredients } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { getAccessibleList } from "@/lib/queries/lists";
-import { parseInput, categorize } from "@/lib/parse";
-import { mergeQuantities } from "@/lib/quantity";
+import { getRecipeRefs } from "@/lib/queries/recipes";
+import { parseInput, categorize, stripCommandPrefix } from "@/lib/parse";
+import { matchRecipe } from "@/lib/recipes/match";
+import { applyItems } from "@/lib/items/add";
 import { CATEGORY_KEYS } from "@/lib/categories";
 
 const MAX_ITEMS_PER_ADD = 50;
@@ -19,7 +21,6 @@ async function requireUser() {
   return session.user;
 }
 
-/** Load the item and assert the caller can access its list. */
 async function itemWithAccess(userId: string, itemId: string) {
   const [item] = await db.select().from(items).where(eq(items.id, itemId)).limit(1);
   if (!item) throw new Error("Item not found");
@@ -33,15 +34,42 @@ const addSchema = z.object({
   text: z.string().min(1).max(2000),
 });
 
-/** Parse free text, categorize (with learned rules), merge compatible dupes. */
+/**
+ * Free-text add. A single phrase matching a saved recipe expands it; otherwise
+ * the text is parsed into items, categorized (with learned rules), and merged.
+ */
 export async function addItems(input: z.infer<typeof addSchema>) {
   const { listId, text } = addSchema.parse(input);
   const user = await requireUser();
   const list = await getAccessibleList(user.id, listId);
   if (!list) throw new Error("List not found");
 
+  const phrase = stripCommandPrefix(text.trim());
+  if (phrase && !/[,\n;]/.test(phrase)) {
+    const hit = matchRecipe(phrase, await getRecipeRefs(list.ownerId));
+    if (hit) {
+      const ings = await db
+        .select()
+        .from(recipeIngredients)
+        .where(eq(recipeIngredients.recipeId, hit.id));
+      const res = await applyItems(
+        listId,
+        ings.map((g) => ({
+          name: g.name,
+          normalizedName: g.normalizedName,
+          qty: g.qty,
+          unit: g.unit,
+          categoryKey: g.categoryKey,
+        })),
+        user.id,
+      );
+      revalidatePath("/");
+      return { kind: "recipe" as const, recipe: hit.name, ...res };
+    }
+  }
+
   const parsed = parseInput(text).slice(0, MAX_ITEMS_PER_ADD);
-  if (parsed.length === 0) return { added: 0 };
+  if (parsed.length === 0) return { kind: "items" as const, added: 0, merged: 0 };
 
   const rules = await db
     .select()
@@ -49,49 +77,19 @@ export async function addItems(input: z.infer<typeof addSchema>) {
     .where(eq(categorizeRules.ownerId, list.ownerId));
   const learned = new Map(rules.map((r) => [r.normalizedName, r.categoryKey]));
 
-  const existing = await db
-    .select()
-    .from(items)
-    .where(and(eq(items.listId, listId), eq(items.checked, false)));
-  const byNorm = new Map(existing.map((it) => [it.normalizedName, it]));
-
-  let added = 0;
-  for (const p of parsed) {
-    const category = categorize(p.name, learned);
-    const prev = byNorm.get(p.normalizedName);
-
-    if (prev) {
-      const merged = mergeQuantities(
-        { qty: prev.qty, unit: prev.unit },
-        { qty: p.qty, unit: p.unit },
-      );
-      if (merged) {
-        await db
-          .update(items)
-          .set({ qty: merged.qty, unit: merged.unit, updatedAt: new Date() })
-          .where(eq(items.id, prev.id));
-        continue;
-      }
-    }
-
-    const [inserted] = await db
-      .insert(items)
-      .values({
-        listId,
-        name: p.name,
-        normalizedName: p.normalizedName,
-        qty: p.qty,
-        unit: p.unit,
-        categoryKey: category,
-        addedByUserId: user.id,
-      })
-      .returning();
-    byNorm.set(p.normalizedName, inserted);
-    added++;
-  }
-
+  const res = await applyItems(
+    listId,
+    parsed.map((p) => ({
+      name: p.name,
+      normalizedName: p.normalizedName,
+      qty: p.qty,
+      unit: p.unit,
+      categoryKey: categorize(p.name, learned),
+    })),
+    user.id,
+  );
   revalidatePath("/");
-  return { added };
+  return { kind: "items" as const, ...res };
 }
 
 export async function toggleItem(input: { itemId: string }) {
@@ -124,7 +122,7 @@ export async function moveItem(input: { itemId: string; categoryKey: string }) {
     .set({ categoryKey, updatedAt: new Date() })
     .where(eq(items.id, itemId));
 
-  // Learn the correction: teach the list's memory so it auto-sorts next time.
+  // Learn the correction so it auto-sorts next time.
   await db
     .insert(categorizeRules)
     .values({ ownerId: list.ownerId, normalizedName: item.normalizedName, categoryKey })
