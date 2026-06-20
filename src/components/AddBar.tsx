@@ -31,20 +31,31 @@ function getSpeechRecognition(): SpeechRecognitionLike | null {
 
 export function AddBar({ listId }: { listId: string }) {
   const router = useRouter();
-  const [text, setText] = useState("");
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState("");
   const [listening, setListening] = useState(false);
   const [pending, startTransition] = useTransition();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  function submit(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) return;
+  // The quantity field is just a prefix — the parser turns "2kg potatoes",
+  // "1L milk", "x3 eggs" into the right qty + unit.
+  function submitText(value: string) {
+    const text = value.trim();
+    if (!text) return;
     startTransition(async () => {
-      await addItems({ listId, text: trimmed });
-      setText("");
+      await addItems({ listId, text });
+      setName("");
+      setQty("");
       router.refresh();
-      inputRef.current?.focus();
+      nameRef.current?.focus();
     });
+  }
+
+  function submitFields() {
+    const n = name.trim();
+    if (!n) return;
+    const q = qty.trim();
+    submitText(q ? `${q} ${n}` : n);
   }
 
   function startVoice() {
@@ -55,7 +66,7 @@ export function AddBar({ listId }: { listId: string }) {
     recognition.continuous = false;
     recognition.onresult = (e) => {
       const transcript = e.results?.[0]?.[0]?.transcript ?? "";
-      if (transcript) submit(transcript);
+      if (transcript) submitText(transcript);
     };
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
@@ -67,24 +78,32 @@ export function AddBar({ listId }: { listId: string }) {
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        submit(text);
+        submitFields();
       }}
-      className="sticky top-[3.5rem] z-20 flex items-center gap-2 rounded-2xl border border-hairline bg-surface p-1.5 shadow-sm"
+      className="sticky top-[3.5rem] z-20 flex items-center gap-1.5 rounded-2xl border border-hairline bg-surface p-1.5 shadow-sm"
     >
       <input
-        ref={inputRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        ref={nameRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         enterKeyHint="done"
-        placeholder="Add — e.g. milk, 2kg potatoes, bananas"
-        aria-label="Add items"
+        placeholder="Add item — milk, eggs…"
+        aria-label="Item name"
         className="min-w-0 flex-1 bg-transparent px-3 py-2 text-fg outline-none placeholder:text-muted"
+      />
+      <input
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+        enterKeyHint="done"
+        placeholder="2kg"
+        aria-label="Quantity"
+        className="w-16 shrink-0 rounded-xl bg-surface-2 px-2 py-2 text-center text-sm text-fg outline-none placeholder:text-muted"
       />
       <button
         type="button"
         onClick={startVoice}
         aria-label="Add by voice"
-        className={`grid size-10 shrink-0 place-items-center rounded-xl transition-colors ${
+        className={`grid size-9 shrink-0 place-items-center rounded-xl transition-colors ${
           listening ? "bg-over/15 text-over" : "text-muted hover:bg-surface-2 hover:text-fg"
         }`}
       >
@@ -92,7 +111,7 @@ export function AddBar({ listId }: { listId: string }) {
       </button>
       <button
         type="submit"
-        disabled={pending || !text.trim()}
+        disabled={pending || !name.trim()}
         aria-label="Add"
         className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white transition-opacity disabled:opacity-40"
       >
