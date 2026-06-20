@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+*.tsbuildinfo
+coverage
+.DS_Store
+docs
+.github
+README.md

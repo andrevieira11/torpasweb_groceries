@@ -1,0 +1,6 @@
+# Normalize line endings to LF — the Docker image builds and runs on Linux.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.webp binary

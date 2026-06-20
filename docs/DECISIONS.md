@@ -2,6 +2,28 @@
 
 Running log of non-obvious choices. Newest first.
 
+## M5 — PWA polish + deploy
+
+- **App icon**: one `src/app/icon.svg` mark (checked-list on brand emerald) rasterized by `sharp`
+  (build-time devDep, `ops/make-icons.mjs`) into `public/` PNGs (192 / 512 / maskable-512 / apple-180).
+  `manifest.ts` references them; `apple-icon` + `appleWebApp` set in metadata.
+- **Service worker** (`public/sw.js`) is intentionally conservative: navigations are **network-first**
+  (lists stay fresh) with an offline cache fallback; only content-hashed `/_next/static` + icons are
+  cache-first. Registered client-side via a tiny `ServiceWorkerRegister`.
+- **Dockerfile** is a 3-stage standalone build (`node:24-alpine`, non-root). The build stage sets
+  **dummy env** so `next build` validates + bundles without real secrets (no DB is touched). The
+  runner copies the standalone server + `.next/static` + `public` + `drizzle/` + `scripts/`, **plus the
+  full `drizzle-orm` and `postgres` packages** — the migrator subpath isn't traced into standalone
+  (the app never imports it). `CMD` migrates then serves. Verified: the built image migrates-on-start,
+  boots, and answers the ingest webhook.
+- **compose**: `db` (healthcheck + named volume `mrlist_pgdata`) → `app` (`pull_policy: always`, every
+  env var mapped explicitly, Watchtower label) → `watchtower` (`--label-enable --cleanup --interval
+  300`). Never `down -v`.
+- **CI** (`.github/workflows/deploy.yml`): push to `main` → build + push `:latest` + `:sha` to GHCR
+  using the automatic `GITHUB_TOKEN` (no extra repo secrets), with GHA layer cache.
+- `ops/Caddyfile` host snippet (TLS + `X-Forwarded-*` → Secure cookies); `.gitattributes` forces LF
+  (the image builds/runs on Linux); `migrate.mjs` silences postgres NOTICEs for clean deploy logs.
+
 ## M4 — Siri ingest webhook
 
 - **One shared `ingestText` core** (`src/lib/items/ingest.ts`) does recipe-detect → parse →

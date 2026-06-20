@@ -1,0 +1,9 @@
+# Host Caddy snippet for MrList. Caddy terminates TLS (auto Let's Encrypt) and
+# proxies to the app container's published port (APP_PORT in .env, default 3000).
+# Caddy sets X-Forwarded-Proto/Host/For by default, which Next + Better Auth use
+# to derive the canonical https origin (so cookies are marked Secure).
+
+list.torpasweb.com {
+	encode zstd gzip
+	reverse_proxy localhost:3000
+}

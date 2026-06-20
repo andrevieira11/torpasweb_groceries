@@ -24,7 +24,7 @@ const CATEGORIES = [
   { key: "other", label: "Other", color: "slate", icon: "ShoppingBasket", order: 99 },
 ];
 
-const sql = postgres(url, { max: 1 });
+const sql = postgres(url, { max: 1, onnotice: () => {} });
 const db = drizzle(sql);
 
 try {
