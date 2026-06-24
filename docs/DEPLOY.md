@@ -97,6 +97,21 @@ Validate before reloading: `caddy validate --config /path/Caddyfile`.
 - **Compose changes** (new env var, new service, port change): Watchtower only
   swaps the image — edit the host `compose`/`.env` and run `docker compose up -d`.
 
+## Manual deploy from the PC (off-server)
+
+CI is the normal path, but you can also build + ship from your PC. **The server
+never builds** — these only build locally and make the server *pull*.
+
+```bash
+docker login ghcr.io -u andrevieira11      # once, PAT with write:packages
+./deploy.sh        # build :latest + git short-SHA, push to GHCR
+./release.sh       # deploy.sh, then SSH the host: docker compose pull && up -d
+```
+
+Windows: `./deploy.ps1` / `./release.ps1`. The release target defaults to
+`drewst@torpasweb:/software/Mrlist`; override with `MRLIST_SSH` / `MRLIST_DIR`.
+After `deploy.sh` alone, Watchtower also picks up `:latest` within ~5 min.
+
 ## Gotchas
 
 - **Never `docker compose down -v`** — `-v` deletes the `mrlist_pgdata` volume
