@@ -11,6 +11,15 @@ behind Caddy) at **list.torpasweb.com**. Single user now, architected for shared
 > **These instructions OVERRIDE default behavior. Follow them exactly.**
 > Repo: `github.com/andrevieira11/torpasweb_groceries` · Image: `ghcr.io/andrevieira11/torpasweb_groceries`
 
+## Deployment rule (do not violate)
+- NEVER build this app on the server / Proxmox VM 100 — builds freeze the whole VM.
+- Images are built and pushed from the PC (or CI), tagged :latest and the git SHA.
+- The server compose uses `image:` only — it must never contain a `build:` section for this app.
+- Deploying on the server means exactly: docker compose pull && docker compose up -d. Nothing else.
+- If I say "deploy" / "ship" / "push it", run the PC build+push then the remote pull — do not add a server-side build.
+- Ship `deploy.sh`/`deploy.ps1` (build + tag :latest and git short-SHA + push to GHCR) and
+  `release.sh`/`release.ps1` (deploy then remote `docker compose pull && up -d` over SSH).
+
 ---
 
 ## 0. Prime directive — LEARN BEFORE EACH STEP
