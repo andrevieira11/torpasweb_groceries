@@ -39,7 +39,11 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   watchtower:
-    image: containrrr/watchtower
+    # nickfedor/watchtower is the maintained fork — the original containrrr image
+    # was archived (Dec 2025) and its old Docker API client (1.25) is rejected by
+    # Docker Engine v29+ ("client version 1.25 is too old, minimum is 1.44").
+    # Drop-in replacement: same command, labels, and socket mount.
+    image: nickfedor/watchtower
     restart: unless-stopped
     command: --label-enable --cleanup --interval 300
     volumes:
