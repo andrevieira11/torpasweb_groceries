@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { planMerge, type IncomingItem } from "./merge-plan";
@@ -14,6 +14,7 @@ export async function applyItems(
   incoming: IncomingItem[],
   addedByUserId: string | null,
   addedByName: string | null = null,
+  section: string | null = null,
 ) {
   if (incoming.length === 0) return { added: 0, merged: 0 };
 
@@ -25,7 +26,14 @@ export async function applyItems(
       unit: items.unit,
     })
     .from(items)
-    .where(and(eq(items.listId, listId), eq(items.checked, false)));
+    .where(
+      and(
+        eq(items.listId, listId),
+        eq(items.checked, false),
+        // merge only within the same section ("tomatoes" for lunch ≠ for the salad)
+        section ? eq(items.section, section) : isNull(items.section),
+      ),
+    );
 
   const plan = planMerge(incoming, existing);
 
@@ -45,6 +53,7 @@ export async function applyItems(
         qty: i.qty,
         unit: i.unit,
         categoryKey: i.categoryKey,
+        section,
         addedByUserId,
         addedByName,
       })),

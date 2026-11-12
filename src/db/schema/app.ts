@@ -95,6 +95,7 @@ export const items = pgTable(
       .notNull()
       .default("other")
       .references(() => categories.key),
+    section: text("section"), // optional collapsible group within a list, e.g. "Family lunch"
     checked: boolean("checked").notNull().default(false),
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     sortOrder: integer("sort_order").notNull().default(0),

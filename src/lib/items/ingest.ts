@@ -6,6 +6,7 @@ import { getRecipeRefs } from "@/lib/queries/recipes";
 import { parseInput, categorize, stripCommandPrefix } from "@/lib/parse";
 import { matchRecipe } from "@/lib/recipes/match";
 import { applyItems } from "./add";
+import { cleanSection, splitSections } from "./sections";
 
 const MAX_ITEMS = 50;
 
@@ -28,8 +29,32 @@ export async function ingestText(opts: {
   text: string;
   addedByUserId: string | null;
   addedByName?: string | null;
+  /** Default section for lines without a "Section:" prefix. */
+  section?: string | null;
 }): Promise<IngestResult> {
-  const { list, text, addedByUserId } = opts;
+  const chunks = splitSections(opts.text);
+  if (chunks.length > 1 || (chunks[0] && chunks[0].section)) {
+    const total: IngestResult = { kind: "items", added: 0, merged: 0, names: [] };
+    for (const c of chunks) {
+      const r = await ingestOne({ ...opts, text: c.text, section: c.section ?? cleanSection(opts.section) });
+      total.added += r.added;
+      total.merged += r.merged;
+      total.names.push(...r.names);
+      if (r.kind === "recipe") { total.kind = "recipe"; total.recipe = r.recipe; }
+    }
+    return total;
+  }
+  return ingestOne({ ...opts, section: cleanSection(opts.section) });
+}
+
+async function ingestOne(opts: {
+  list: { id: string; ownerId: string };
+  text: string;
+  addedByUserId: string | null;
+  addedByName?: string | null;
+  section: string | null;
+}): Promise<IngestResult> {
+  const { list, text, addedByUserId, section } = opts;
   const addedByName = opts.addedByName ?? null;
 
   const phrase = stripCommandPrefix(text.trim());
@@ -51,6 +76,7 @@ export async function ingestText(opts: {
         })),
         addedByUserId,
         addedByName,
+        section,
       );
       return { kind: "recipe", recipe: hit.name, ...res, names: ings.map((g) => g.name) };
     }
@@ -76,6 +102,7 @@ export async function ingestText(opts: {
     })),
     addedByUserId,
     addedByName,
+    section,
   );
   return { kind: "items", ...res, names: parsed.map((p) => p.name) };
 }
