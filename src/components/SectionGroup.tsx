@@ -6,6 +6,7 @@ import { ChevronDown, FolderOpen } from "lucide-react";
 import type { CategoryColor } from "@/lib/categories";
 import { CategoryGroup } from "./CategoryGroup";
 import type { ItemView } from "./ItemRow";
+import { useT } from "./LangProvider";
 
 export type SectionCategory = {
   key: string;
@@ -25,6 +26,7 @@ export function SectionGroup({
   name: string;
   categories: SectionCategory[];
 }) {
+  const tr = useT();
   const storageKey = `mrlist:section:${listId}:${name}`;
   const [open, setOpen] = useState(true);
 
@@ -56,7 +58,7 @@ export function SectionGroup({
         <FolderOpen className="size-5 text-muted" aria-hidden />
         <span className="flex-1 text-left text-base font-semibold">{name}</span>
         <span className="text-xs font-medium text-muted">
-          {remaining > 0 ? `${remaining} left` : "all done ✓"}
+          {remaining > 0 ? `${remaining} ${tr("left")}` : tr("allDone")}
         </span>
         <ChevronDown
           className={`size-5 text-muted transition-transform ${open ? "" : "-rotate-90"}`}

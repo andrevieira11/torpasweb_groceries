@@ -96,6 +96,8 @@ export const items = pgTable(
       .default("other")
       .references(() => categories.key),
     section: text("section"), // optional collapsible group within a list, e.g. "Family lunch"
+    nameEn: text("name_en"), // translations shown per UI language (2026-11-12)
+    namePt: text("name_pt"),
     checked: boolean("checked").notNull().default(false),
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -164,3 +166,11 @@ export const categorizeRules = pgTable(
   },
   (t) => [uniqueIndex("categorize_rules_owner_norm_idx").on(t.ownerId, t.normalizedName)],
 );
+
+/** Machine-translation memory for item names (normalized key → EN + PT). */
+export const translations = pgTable("translations", {
+  key: text("key").primaryKey(),
+  en: text("en").notNull(),
+  pt: text("pt").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

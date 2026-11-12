@@ -3,6 +3,8 @@ import { TabBar } from "@/components/TabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SignOutButton } from "@/components/SignOutButton";
 import { MotionProvider } from "@/components/MotionProvider";
+import { LangProvider, LangToggle } from "@/components/LangProvider";
+import { getLang } from "@/lib/i18n/server";
 
 export default async function AppLayout({
   children,
@@ -10,14 +12,17 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   await requireSession();
+  const lang = await getLang();
 
   return (
+    <LangProvider lang={lang}>
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-hairline bg-bg/85 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-lg">
         <span className="text-lg font-semibold tracking-tight">
           Mr<span className="text-brand">List</span>
         </span>
         <div className="flex items-center gap-1">
+          <LangToggle />
           <ThemeToggle />
           <SignOutButton />
         </div>
@@ -29,5 +34,6 @@ export default async function AppLayout({
 
       <TabBar />
     </div>
+    </LangProvider>
   );
 }

@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, ListChecks } from "lucide-react";
+import { useT } from "./LangProvider";
 
 const TABS = [
-  { href: "/", label: "List", icon: ListChecks },
-  { href: "/recipes", label: "Recipes", icon: BookOpen },
+  { href: "/", label: "list", icon: ListChecks },
+  { href: "/recipes", label: "recipes", icon: BookOpen },
 ] as const;
 
 export function TabBar() {
   const pathname = usePathname();
+  const tr = useT();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/85 backdrop-blur-lg">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
@@ -28,7 +30,7 @@ export function TabBar() {
               }`}
             >
               <Icon className="size-6" strokeWidth={active ? 2.4 : 1.9} />
-              {tab.label}
+              {tr(tab.label)}
             </Link>
           );
         })}

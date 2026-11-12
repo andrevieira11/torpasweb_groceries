@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "./LangProvider";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -23,11 +24,11 @@ type Active = ListLite & { role: "owner" | "member" };
 type Tokens = { guest?: string; member_invite?: string };
 
 const EXPIRY_OPTIONS = [
-  { label: "No expiry", days: null },
-  { label: "1 day", days: 1 },
-  { label: "3 days", days: 3 },
-  { label: "1 week", days: 7 },
-];
+  { label: "noExpiry", days: null },
+  { label: "oneDay", days: 1 },
+  { label: "threeDays", days: 3 },
+  { label: "oneWeek", days: 7 },
+] as const;
 
 export function ListMenu({
   active,
@@ -146,6 +147,7 @@ function HomeView({
   onDelete: () => void;
   onLeave: () => void;
 }) {
+  const tr = useT();
   return (
     <div className="flex flex-col gap-1">
       <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -174,7 +176,7 @@ function HomeView({
         className="mt-1 flex items-center gap-2 rounded-xl px-2 py-2.5 text-left text-brand transition-colors hover:bg-surface-2"
       >
         <Plus className="size-5" strokeWidth={2.4} />
-        <span className="text-[15px] font-medium">New list</span>
+        <span className="text-[15px] font-medium">{tr("newList")}</span>
       </button>
 
       <div className="my-2 border-t border-hairline" />
@@ -187,7 +189,7 @@ function HomeView({
             className="flex items-center gap-2 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
           >
             <Share2 className="size-5 text-muted" />
-            <span className="text-[15px] font-medium">Share &ldquo;{active.name}&rdquo;</span>
+            <span className="text-[15px] font-medium">{tr("share")} &ldquo;{active.name}&rdquo;</span>
           </button>
           {!active.isDefault && (
             <button
@@ -197,7 +199,7 @@ function HomeView({
               className="flex items-center gap-2 rounded-xl px-2 py-2.5 text-left text-over transition-colors hover:bg-over/10"
             >
               <Trash2 className="size-5" />
-              <span className="text-[15px] font-medium">Delete list</span>
+              <span className="text-[15px] font-medium">{tr("deleteList")}</span>
             </button>
           )}
         </>
@@ -209,7 +211,7 @@ function HomeView({
           className="flex items-center gap-2 rounded-xl px-2 py-2.5 text-left text-over transition-colors hover:bg-over/10"
         >
           <LogOut className="size-5" />
-          <span className="text-[15px] font-medium">Leave list</span>
+          <span className="text-[15px] font-medium">{tr("leaveList")}</span>
         </button>
       )}
     </div>
@@ -225,17 +227,18 @@ function NewView({
   onBack: () => void;
   onCreate: (name: string, days: number | null) => void;
 }) {
+  const tr = useT();
   const [name, setName] = useState("");
   const [days, setDays] = useState<number | null>(null);
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-1 text-sm font-semibold">New list</p>
+      <p className="px-1 text-sm font-semibold">{tr("newList")}</p>
       <input
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="List name — e.g. Beach trip"
+        placeholder={tr("listNamePlaceholder")}
         aria-label="List name"
         className="h-12 rounded-2xl border border-hairline bg-bg px-4 text-base text-fg outline-none focus:border-brand"
       />
@@ -249,7 +252,7 @@ function NewView({
               days === opt.days ? "border-brand bg-brand/10 text-fg" : "border-hairline text-muted"
             }`}
           >
-            {opt.label}
+            {tr(opt.label)}
           </button>
         ))}
       </div>
@@ -283,18 +286,19 @@ function ShareView({
   initial: Tokens;
   onBack: () => void;
 }) {
+  const tr = useT();
   const [invite, setInvite] = useState<string | undefined>(initial.member_invite);
   const [guest, setGuest] = useState<string | undefined>(initial.guest);
   const [pending, startTransition] = useTransition();
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-1 text-sm font-semibold">Share &ldquo;{active.name}&rdquo;</p>
+      <p className="px-1 text-sm font-semibold">{tr("share")} &ldquo;{active.name}&rdquo;</p>
 
       <LinkRow
         icon={<UserPlus className="size-5 text-muted" />}
-        title="Invite a member"
-        hint="They sign in and can add + check items."
+        title={tr("inviteMember")}
+        hint={tr("inviteMemberBody")}
         path="join"
         token={invite}
         pending={pending}
@@ -308,8 +312,8 @@ function ShareView({
 
       <LinkRow
         icon={<LinkIcon className="size-5 text-muted" />}
-        title="Guest link (no account)"
-        hint="Anyone with the link can view + add + check."
+        title={tr("guestLink")}
+        hint={tr("guestLinkBody")}
         path="g"
         token={guest}
         pending={pending}
@@ -367,6 +371,7 @@ function LinkRow({
   pending: boolean;
   onCreate: () => void;
 }) {
+  const tr = useT();
   const [copied, setCopied] = useState(false);
 
   function copy() {
@@ -394,7 +399,7 @@ function LinkRow({
           }`}
         >
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? "Copied link" : "Copy link"}
+          {copied ? tr("copiedLink") : tr("copyLink")}
         </button>
       ) : (
         <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useLang, useT } from "./LangProvider";
 import { useRouter } from "next/navigation";
 import { Mic, Plus } from "lucide-react";
 import { addItems } from "@/lib/actions/items";
@@ -29,7 +30,10 @@ function getSpeechRecognition(): SpeechRecognitionLike | null {
   return Ctor ? new Ctor() : null;
 }
 
+
 export function AddBar({ listId }: { listId: string }) {
+  const tr = useT();
+  const lang = useLang();
   const router = useRouter();
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
@@ -61,7 +65,7 @@ export function AddBar({ listId }: { listId: string }) {
   function startVoice() {
     const recognition = getSpeechRecognition();
     if (!recognition) return;
-    recognition.lang = navigator.language || "en-US";
+    recognition.lang = lang === "pt" ? "pt-PT" : "en-GB";
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.onresult = (e) => {
@@ -87,8 +91,8 @@ export function AddBar({ listId }: { listId: string }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         enterKeyHint="done"
-        placeholder="Add item — milk, eggs…"
-        aria-label="Item name"
+        placeholder={tr("addPlaceholder")}
+        aria-label={tr("itemName")}
         className="min-w-0 flex-1 bg-transparent px-3 py-2 text-fg outline-none placeholder:text-muted"
       />
       <input
@@ -96,13 +100,13 @@ export function AddBar({ listId }: { listId: string }) {
         onChange={(e) => setQty(e.target.value)}
         enterKeyHint="done"
         placeholder="2kg"
-        aria-label="Quantity"
+        aria-label={tr("quantity")}
         className="w-16 shrink-0 rounded-xl bg-surface-2 px-2 py-2 text-center text-sm text-fg outline-none placeholder:text-muted"
       />
       <button
         type="button"
         onClick={startVoice}
-        aria-label="Add by voice"
+        aria-label={tr("addByVoice")}
         className={`grid size-9 shrink-0 place-items-center rounded-xl transition-colors ${
           listening ? "bg-over/15 text-over" : "text-muted hover:bg-surface-2 hover:text-fg"
         }`}
@@ -112,7 +116,7 @@ export function AddBar({ listId }: { listId: string }) {
       <button
         type="submit"
         disabled={pending || !name.trim()}
-        aria-label="Add"
+        aria-label={tr("add")}
         className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white transition-opacity disabled:opacity-40"
       >
         <Plus className="size-5" strokeWidth={2.6} />

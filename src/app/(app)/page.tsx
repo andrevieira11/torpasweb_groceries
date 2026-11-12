@@ -8,13 +8,17 @@ import { CategoryGroup } from "@/components/CategoryGroup";
 import { SectionGroup } from "@/components/SectionGroup";
 import { ClearCheckedButton } from "@/components/ClearCheckedButton";
 import { ListMenu } from "@/components/ListMenu";
+import { getLang } from "@/lib/i18n/server";
+import { categoryLabel, itemNames, t } from "@/lib/i18n/strings";
+import { fillMissingTranslations } from "@/lib/i18n/backfill";
 
 export default async function ListPage() {
   const session = await requireSession();
   const active = await getActiveList(session.user.id);
   const isOwner = active.ownerId === session.user.id;
 
-  const [userLists, rows, tokens] = await Promise.all([
+  const lang = await getLang();
+  const [userLists, rawRows, tokens] = await Promise.all([
     getUserLists(session.user.id),
     getListItems(active.id),
     isOwner
@@ -22,9 +26,11 @@ export default async function ListPage() {
       : Promise.resolve({} as { guest?: string; member_invite?: string }),
   ]);
 
+  const rows = await fillMissingTranslations(rawRows);
+
   const toView = (r: (typeof rows)[number]) => ({
     id: r.id,
-    name: r.name,
+    ...itemNames(lang, r),
     qty: r.qty,
     unit: r.unit,
     categoryKey: r.categoryKey,
@@ -47,7 +53,7 @@ export default async function ListPage() {
     name,
     categories: byCategory(rows.filter((r) => r.section === name)).map(({ category, items }) => ({
       key: category.key,
-      label: category.label,
+      label: categoryLabel(lang, category.key, category.label),
       color: category.color,
       icon: category.icon,
       items,
@@ -85,10 +91,9 @@ export default async function ListPage() {
           <div className="grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted">
             <ShoppingBasket className="size-7" />
           </div>
-          <p className="text-base font-medium">Nothing here yet</p>
+          <p className="text-base font-medium">{t(lang, "emptyTitle")}</p>
           <p className="max-w-[18rem] text-sm text-muted">
-            Type or speak above — &ldquo;milk, 2kg potatoes, bananas&rdquo; — and it
-            sorts itself into the right aisles.
+            {t(lang, "emptyBody")}
           </p>
         </div>
       ) : (
@@ -96,7 +101,7 @@ export default async function ListPage() {
           {groups.map(({ category, items }) => (
             <CategoryGroup
               key={category.key}
-              label={category.label}
+              label={categoryLabel(lang, category.key, category.label)}
               color={category.color}
               icon={category.icon}
               items={items}
@@ -107,7 +112,7 @@ export default async function ListPage() {
           ))}
           {sections.length === 0 && (
             <p className="px-2 text-xs text-muted">
-              Tip: type &ldquo;Lunch: cod, potatoes&rdquo; to put items in a collapsible section.
+              {t(lang, "sectionTip")}
             </p>
           )}
         </div>

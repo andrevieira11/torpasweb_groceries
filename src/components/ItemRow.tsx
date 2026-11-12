@@ -9,10 +9,13 @@ import { formatQuantity } from "@/lib/quantity";
 import { deleteItem, moveItem, toggleItem } from "@/lib/actions/items";
 import { CategoryIcon } from "./CategoryIcon";
 import { CATEGORY_TEXT } from "./category-style";
+import { useLang, useT } from "./LangProvider";
+import { categoryLabel } from "@/lib/i18n/strings";
 
 export type ItemView = {
   id: string;
   name: string;
+  alt?: string | null; // same item in the other language
   qty: number | null;
   unit: string | null;
   categoryKey: string;
@@ -21,6 +24,8 @@ export type ItemView = {
 
 export function ItemRow({ item }: { item: ItemView }) {
   const router = useRouter();
+  const tr = useT();
+  const lang = useLang();
   const [checked, setChecked] = useState(item.checked);
   const [open, setOpen] = useState(false);
   const [, startTransition] = useTransition();
@@ -89,6 +94,9 @@ export function ItemRow({ item }: { item: ItemView }) {
             }`}
           >
             {item.name}
+            {item.alt && (
+              <span className="ml-1.5 text-xs font-normal text-muted">· {item.alt}</span>
+            )}
           </span>
           {qty && (
             <span className="shrink-0 text-xs font-medium text-muted">{qty}</span>
@@ -98,7 +106,7 @@ export function ItemRow({ item }: { item: ItemView }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          aria-label="Item options"
+          aria-label={tr("itemOptions")}
           aria-expanded={open}
           className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
@@ -130,14 +138,14 @@ export function ItemRow({ item }: { item: ItemView }) {
                     }`}
                   >
                     <CategoryIcon name={c.icon} className={`size-3.5 ${CATEGORY_TEXT[c.color]}`} />
-                    {c.label}
+                    {categoryLabel(lang, c.key, c.label)}
                   </button>
                 );
               })}
               <button
                 type="button"
                 onClick={remove}
-                aria-label={`Delete ${item.name}`}
+                aria-label={`${tr("delete")} ${item.name}`}
                 className="ml-1 grid size-8 shrink-0 place-items-center rounded-full border border-hairline text-over transition-colors hover:bg-over/10"
               >
                 <Trash2 className="size-4" />

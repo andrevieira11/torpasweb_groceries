@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clearChecked } from "@/lib/actions/items";
+import { useT } from "./LangProvider";
 
 export function ClearCheckedButton({
   listId,
@@ -11,6 +12,7 @@ export function ClearCheckedButton({
   listId: string;
   count: number;
 }) {
+  const tr = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -26,7 +28,7 @@ export function ClearCheckedButton({
       }
       className="text-sm font-medium text-muted transition-colors hover:text-fg disabled:opacity-50"
     >
-      Clear done ({count})
+      {tr("clearDone")} ({count})
     </button>
   );
 }

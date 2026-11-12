@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { planMerge, type IncomingItem } from "./merge-plan";
+import { translateName } from "@/lib/i18n/translate";
 
 /**
  * Add a batch of resolved items to a list, merging compatible quantities into
@@ -45,8 +46,11 @@ export async function applyItems(
   }
 
   if (plan.inserts.length > 0) {
+    const names = await Promise.all(plan.inserts.map((i) => translateName(i.name)));
     await db.insert(items).values(
-      plan.inserts.map((i) => ({
+      plan.inserts.map((i, n) => ({
+        nameEn: names[n].en,
+        namePt: names[n].pt,
         listId,
         name: i.name,
         normalizedName: i.normalizedName,
