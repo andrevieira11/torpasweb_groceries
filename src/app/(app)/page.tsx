@@ -9,7 +9,9 @@ import { SectionGroup } from "@/components/SectionGroup";
 import { ClearCheckedButton } from "@/components/ClearCheckedButton";
 import { ListMenu } from "@/components/ListMenu";
 import { getLang } from "@/lib/i18n/server";
-import { categoryLabel, itemNames, t } from "@/lib/i18n/strings";
+import { categoryLabel, itemNames, t, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
+import { cookies } from "next/headers";
+import { SectionsProvider, ViewToggle } from "@/components/ListUi";
 import { fillMissingTranslations } from "@/lib/i18n/backfill";
 
 export default async function ListPage() {
@@ -18,6 +20,7 @@ export default async function ListPage() {
   const isOwner = active.ownerId === session.user.id;
 
   const lang = await getLang();
+  const view: View = (await cookies()).get(VIEW_COOKIE)?.value === "dish" ? "dish" : "aisle";
   const [userLists, rawRows, tokens] = await Promise.all([
     getUserLists(session.user.id),
     getListItems(active.id),
@@ -31,6 +34,8 @@ export default async function ListPage() {
   const toView = (r: (typeof rows)[number]) => ({
     id: r.id,
     ...itemNames(lang, r),
+    dish: r.section,
+    showDish: view === "aisle",
     qty: r.qty,
     unit: r.unit,
     categoryKey: r.categoryKey,
@@ -44,12 +49,14 @@ export default async function ListPage() {
 
   // Items without a section first (as before), then one collapsible card per section,
   // in the order each section was first used.
-  const groups = byCategory(rows.filter((r) => !r.section));
+  // Aisle view (default, for shopping): everything by store aisle, items tagged with their dish.
+  // Dish view: unsectioned items first, then one collapsible card per dish.
+  const groups = byCategory(view === "aisle" ? rows : rows.filter((r) => !r.section));
   const sectionNames: string[] = [];
   for (const r of [...rows].sort((a, b) => +a.createdAt - +b.createdAt)) {
     if (r.section && !sectionNames.includes(r.section)) sectionNames.push(r.section);
   }
-  const sections = sectionNames.map((name) => ({
+  const sections = (view === "aisle" ? [] : sectionNames).map((name) => ({
     name,
     categories: byCategory(rows.filter((r) => r.section === name)).map(({ category, items }) => ({
       key: category.key,
@@ -86,6 +93,9 @@ export default async function ListPage() {
 
       <AddBar listId={active.id} />
 
+      {sectionNames.length > 0 && <ViewToggle view={view} />}
+
+      <SectionsProvider sections={sectionNames}>
       {groups.length === 0 && sections.length === 0 ? (
         <div className="mt-2 flex flex-col items-center gap-3 rounded-3xl border border-hairline bg-surface px-6 py-14 text-center">
           <div className="grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted">
@@ -110,13 +120,14 @@ export default async function ListPage() {
           {sections.map((sec) => (
             <SectionGroup key={sec.name} listId={active.id} name={sec.name} categories={sec.categories} />
           ))}
-          {sections.length === 0 && (
+          {sectionNames.length === 0 && (
             <p className="px-2 text-xs text-muted">
               {t(lang, "sectionTip")}
             </p>
           )}
         </div>
       )}
+      </SectionsProvider>
     </section>
   );
 }

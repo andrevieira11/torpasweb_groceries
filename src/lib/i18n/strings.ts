@@ -1,6 +1,8 @@
 /** UI language (Andre, 2026-11-12: the whole app in English or Portuguese, one tap to switch). */
 export type Lang = "en" | "pt";
 export const LANG_COOKIE = "mrlist-lang";
+export const VIEW_COOKIE = "mrlist-view";
+export type View = "aisle" | "dish";
 export const DEFAULT_LANG: Lang = "pt";
 
 export function asLang(v: string | undefined | null): Lang {
@@ -47,6 +49,18 @@ const S = {
   guestLinkBody: { en: "Anyone with the link can view + add + check.", pt: "Quem tiver o link pode ver, adicionar e riscar." },
   copyLink: { en: "Copy link", pt: "Copiar link" },
   copiedLink: { en: "Copied link", pt: "Link copiado" },
+  edit: { en: "Edit", pt: "Editar" },
+  save: { en: "Save", pt: "Guardar" },
+  cancel: { en: "Cancel", pt: "Cancelar" },
+  dish: { en: "Dish", pt: "Prato" },
+  aisle: { en: "Aisle", pt: "Corredor" },
+  noDish: { en: "No dish", pt: "Sem prato" },
+  byAisle: { en: "By aisle", pt: "Por corredor" },
+  byDish: { en: "By dish", pt: "Por prato" },
+  viewHelp: {
+    en: "Shopping? Use “By aisle”: everything in store order, each item tagged with its dish.",
+    pt: "Às compras? Usa “Por corredor”: tudo pela ordem da loja, cada produto com o prato ao lado.",
+  },
 } as const;
 
 export type StringKey = keyof typeof S;

@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { CATEGORIES } from "@/lib/categories";
 import { formatQuantity } from "@/lib/quantity";
-import { deleteItem, moveItem, toggleItem } from "@/lib/actions/items";
+import { deleteItem, editItem, moveItem, setItemSection, toggleItem } from "@/lib/actions/items";
+import { useSections } from "./ListUi";
 import { CategoryIcon } from "./CategoryIcon";
 import { CATEGORY_TEXT } from "./category-style";
 import { useLang, useT } from "./LangProvider";
@@ -16,6 +17,8 @@ export type ItemView = {
   id: string;
   name: string;
   alt?: string | null; // same item in the other language
+  dish?: string | null; // its section; shown as a tag in the aisle view
+  showDish?: boolean;
   qty: number | null;
   unit: string | null;
   categoryKey: string;
@@ -28,6 +31,9 @@ export function ItemRow({ item }: { item: ItemView }) {
   const lang = useLang();
   const [checked, setChecked] = useState(item.checked);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const sections = useSections();
+  const [draft, setDraft] = useState("");
   const [, startTransition] = useTransition();
 
   const qty = formatQuantity(item.qty, item.unit);
@@ -49,6 +55,30 @@ export function ItemRow({ item }: { item: ItemView }) {
     setOpen(false);
     startTransition(async () => {
       await moveItem({ itemId: item.id, categoryKey });
+      router.refresh();
+    });
+  }
+
+  function startEdit() {
+    setDraft([formatQuantity(item.qty, item.unit), item.name].filter(Boolean).join(" "));
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    const text = draft.trim();
+    if (!text) return;
+    setEditing(false);
+    setOpen(false);
+    startTransition(async () => {
+      await editItem({ itemId: item.id, text });
+      router.refresh();
+    });
+  }
+
+  function moveDish(section: string | null) {
+    setOpen(false);
+    startTransition(async () => {
+      await setItemSection({ itemId: item.id, section });
       router.refresh();
     });
   }
@@ -101,6 +131,11 @@ export function ItemRow({ item }: { item: ItemView }) {
           {qty && (
             <span className="shrink-0 text-xs font-medium text-muted">{qty}</span>
           )}
+          {item.showDish && item.dish && (
+            <span className="shrink-0 truncate rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+              {item.dish}
+            </span>
+          )}
         </button>
 
         <button
@@ -123,33 +158,87 @@ export function ItemRow({ item }: { item: ItemView }) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 pl-9">
-              {CATEGORIES.map((c) => {
-                const current = c.key === item.categoryKey;
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    onClick={() => move(c.key)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      current
-                        ? "border-brand bg-brand/10 text-fg"
-                        : "border-hairline text-muted hover:bg-surface-2"
-                    }`}
-                  >
-                    <CategoryIcon name={c.icon} className={`size-3.5 ${CATEGORY_TEXT[c.color]}`} />
-                    {categoryLabel(lang, c.key, c.label)}
+            <div className="flex flex-col gap-2.5 pb-3 pl-9 pr-1">
+              {editing ? (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-hairline bg-bg px-3 text-[15px] outline-none focus:border-brand"
+                  />
+                  <button type="button" onClick={saveEdit} className="h-10 rounded-xl bg-brand px-3 text-sm font-semibold text-white">
+                    {tr("save")}
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={remove}
-                aria-label={`${tr("delete")} ${item.name}`}
-                className="ml-1 grid size-8 shrink-0 place-items-center rounded-full border border-hairline text-over transition-colors hover:bg-over/10"
-              >
-                <Trash2 className="size-4" />
-              </button>
+                  <button type="button" onClick={() => setEditing(false)} className="h-10 rounded-xl border border-hairline px-3 text-sm text-muted">
+                    {tr("cancel")}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={startEdit}
+                    className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-hairline text-sm font-semibold"
+                  >
+                    <Pencil className="size-4" /> {tr("edit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={remove}
+                    aria-label={`${tr("delete")} ${item.name}`}
+                    className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-hairline text-sm font-semibold text-over"
+                  >
+                    <Trash2 className="size-4" /> {tr("delete")}
+                  </button>
+                </div>
+              )}
+
+              {sections.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">{tr("dish")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...sections, null].map((sec) => {
+                      const current = (item.dish ?? null) === sec;
+                      return (
+                        <button
+                          key={sec ?? "__none"}
+                          type="button"
+                          onClick={() => moveDish(sec)}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            current ? "border-brand bg-brand/10 text-fg" : "border-hairline text-muted"
+                          }`}
+                        >
+                          {sec ?? tr("noDish")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">{tr("aisle")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORIES.map((c) => {
+                    const current = c.key === item.categoryKey;
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => move(c.key)}
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          current ? "border-brand bg-brand/10 text-fg" : "border-hairline text-muted hover:bg-surface-2"
+                        }`}
+                      >
+                        <CategoryIcon name={c.icon} className={`size-3.5 ${CATEGORY_TEXT[c.color]}`} />
+                        {categoryLabel(lang, c.key, c.label)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
