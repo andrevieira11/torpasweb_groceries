@@ -114,6 +114,26 @@ export const items = pgTable(
   ],
 );
 
+/**
+ * A dish (a named section of one list, e.g. "Lasanha"). Items join it by name through
+ * `items.section`, so every existing write path keeps working; this row is what lets a dish
+ * exist while it has no ingredients (just created, or its last one removed) and carries its emoji.
+ */
+export const listDishes = pgTable(
+  "list_dishes",
+  {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    listId: text("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // == items.section
+    emoji: text("emoji"), // null = suggest from the name, "" = none
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("list_dishes_list_name_idx").on(t.listId, t.name)],
+);
+
 export const recipes = pgTable(
   "recipes",
   {

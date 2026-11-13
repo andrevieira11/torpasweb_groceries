@@ -4,6 +4,8 @@ import { getListItems } from "@/lib/queries/lists";
 import { CATEGORIES } from "@/lib/categories";
 import { GuestList } from "@/components/GuestList";
 import { LinkInvalid } from "@/components/LinkInvalid";
+import { getLang } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/strings";
 
 export const metadata: Metadata = { title: "Shared list", robots: { index: false } };
 
@@ -15,7 +17,8 @@ export default async function GuestPage({
   const { token } = await params;
   const resolved = await resolveGuestToken(token);
   if (!resolved) {
-    return <LinkInvalid message="This guest link is no longer valid or has expired." />;
+    const lang = await getLang();
+    return <LinkInvalid lang={lang} message={t(lang, "guestLinkInvalid")} />;
   }
 
   const rows = await getListItems(resolved.list.id);

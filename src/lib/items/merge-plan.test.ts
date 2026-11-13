@@ -48,3 +48,19 @@ test("batch dup folds into an existing update (500g + 0.5kg + 0.5kg = 1.5kg)", (
   assert.deepEqual(plan.updates, [{ id: "e1", qty: 1.5, unit: "kg" }]);
   assert.equal(plan.inserts.length, 0);
 });
+
+test("an item typed in the other language merges into the row's translation", () => {
+  const existing = [{ id: "e1", normalizedName: "egg", qty: 3, unit: "x", aliases: ["ovo", "egg"] }];
+  const plan = planMerge([{ name: "ovos", normalizedName: "ovo", qty: 2, unit: null, categoryKey: "dairy" }], existing);
+  assert.deepEqual(plan.updates, [{ id: "e1", qty: 5, unit: "x" }]);
+  assert.equal(plan.inserts.length, 0);
+});
+
+test("a typed name beats another row's alias", () => {
+  const existing = [
+    { id: "a", normalizedName: "lime", qty: 1, unit: null, aliases: ["lima"] },
+    { id: "b", normalizedName: "lima", qty: 1, unit: null, aliases: ["file"] },
+  ];
+  const plan = planMerge([inc("lima", 2, null)], existing);
+  assert.deepEqual(plan.updates, [{ id: "b", qty: 3, unit: null }]);
+});

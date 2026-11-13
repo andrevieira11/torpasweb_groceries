@@ -4,8 +4,10 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { joinList } from "@/lib/actions/sharing";
+import { useT } from "./LangProvider";
 
 export function JoinInvite({ token, listName }: { token: string; listName: string }) {
+  const tr = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -15,7 +17,7 @@ export function JoinInvite({ token, listName }: { token: string; listName: strin
         <Users className="size-7" />
       </div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted">You&apos;ve been invited to join</p>
+        <p className="text-sm text-muted">{tr("invitedToJoin")}</p>
         <p className="text-xl font-semibold tracking-tight">{listName}</p>
       </div>
       <button
@@ -28,9 +30,9 @@ export function JoinInvite({ token, listName }: { token: string; listName: strin
             router.refresh();
           })
         }
-        className="h-12 w-full max-w-xs rounded-2xl bg-brand text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="h-12 w-full max-w-xs rounded-2xl bg-brand text-base font-semibold text-on-brand transition-opacity hover:opacity-90 disabled:opacity-60"
       >
-        {pending ? "Joining…" : "Join list"}
+        {pending ? tr("joining") : tr("joinList")}
       </button>
     </main>
   );

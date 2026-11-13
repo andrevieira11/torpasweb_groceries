@@ -1,12 +1,13 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { categorizeRules, recipeIngredients } from "@/db/schema";
+import { categorizeRules, listDishes, recipeIngredients } from "@/db/schema";
 import { getRecipeRefs } from "@/lib/queries/recipes";
 import { parseInput, categorize, stripCommandPrefix } from "@/lib/parse";
 import { matchRecipe } from "@/lib/recipes/match";
 import { applyItems } from "./add";
-import { cleanSection, splitSections } from "./sections";
+import { canonicalDish, splitSections } from "./sections";
+import type { Lang } from "@/lib/i18n/strings";
 
 const MAX_ITEMS = 50;
 
@@ -31,12 +32,32 @@ export async function ingestText(opts: {
   addedByName?: string | null;
   /** Default section for lines without a "Section:" prefix. */
   section?: string | null;
+  /** The typer's UI language (kept as that language's name); unknown for Siri/guests. */
+  lang?: Lang;
+  /**
+   * The browser's optimistic row ids, one per parsed item — used only for plain text
+   * (one line, no "Name:", not a recipe), the one case the browser can predict.
+   */
+  ids?: string[];
 }): Promise<IngestResult> {
   const chunks = splitSections(opts.text);
+  // File "lunch:" under an existing "Lunch" dish instead of starting a near-duplicate.
+  const named = opts.section || chunks.some((c) => c.section);
+  const dishNames = named
+    ? (
+        await db
+          .select({ name: listDishes.name })
+          .from(listDishes)
+          .where(eq(listDishes.listId, opts.list.id))
+      ).map((d) => d.name)
+    : [];
+  const fallback = canonicalDish(opts.section, dishNames);
   if (chunks.length > 1 || (chunks[0] && chunks[0].section)) {
     const total: IngestResult = { kind: "items", added: 0, merged: 0, names: [] };
     for (const c of chunks) {
-      const r = await ingestOne({ ...opts, text: c.text, section: c.section ?? cleanSection(opts.section) });
+      const section = canonicalDish(c.section, dishNames) ?? fallback;
+      if (section && !dishNames.includes(section)) dishNames.push(section);
+      const r = await ingestOne({ ...opts, ids: undefined, text: c.text, section });
       total.added += r.added;
       total.merged += r.merged;
       total.names.push(...r.names);
@@ -44,7 +65,7 @@ export async function ingestText(opts: {
     }
     return total;
   }
-  return ingestOne({ ...opts, section: cleanSection(opts.section) });
+  return ingestOne({ ...opts, section: fallback });
 }
 
 async function ingestOne(opts: {
@@ -53,8 +74,10 @@ async function ingestOne(opts: {
   addedByUserId: string | null;
   addedByName?: string | null;
   section: string | null;
+  lang?: Lang;
+  ids?: string[];
 }): Promise<IngestResult> {
-  const { list, text, addedByUserId, section } = opts;
+  const { list, text, addedByUserId, section, lang, ids } = opts;
   const addedByName = opts.addedByName ?? null;
 
   const phrase = stripCommandPrefix(text.trim());
@@ -77,6 +100,7 @@ async function ingestOne(opts: {
         addedByUserId,
         addedByName,
         section,
+        lang,
       );
       return { kind: "recipe", recipe: hit.name, ...res, names: ings.map((g) => g.name) };
     }
@@ -93,7 +117,8 @@ async function ingestOne(opts: {
 
   const res = await applyItems(
     list.id,
-    parsed.map((p) => ({
+    parsed.map((p, n) => ({
+      id: ids?.[n],
       name: p.name,
       normalizedName: p.normalizedName,
       qty: p.qty,
@@ -103,6 +128,7 @@ async function ingestOne(opts: {
     addedByUserId,
     addedByName,
     section,
+    lang,
   );
   return { kind: "items", ...res, names: parsed.map((p) => p.name) };
 }

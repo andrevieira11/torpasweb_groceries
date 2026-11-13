@@ -6,6 +6,9 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { parseInput, categorize } from "@/lib/parse";
 import { CATEGORIES } from "@/lib/categories";
 import { createRecipe, deleteRecipe, updateRecipe } from "@/lib/actions/recipes";
+import { newId } from "@/lib/ids";
+import { categoryLabel } from "@/lib/i18n/strings";
+import { useLang, useT } from "./LangProvider";
 
 type Ingredient = {
   name: string;
@@ -18,6 +21,8 @@ type Initial = { id: string; name: string; ingredients: Ingredient[] };
 
 export function RecipeForm({ initial }: { initial?: Initial }) {
   const router = useRouter();
+  const tr = useT();
+  const lang = useLang();
   const [name, setName] = useState(initial?.name ?? "");
   const [rows, setRows] = useState<Row[]>(
     () => (initial?.ingredients ?? []).map((g, i) => ({ key: `init-${i}`, ...g })),
@@ -32,7 +37,7 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
     setRows((prev) => [
       ...prev,
       ...parsed.map((p) => ({
-        key: crypto.randomUUID(),
+        key: newId(), // crypto.randomUUID() is missing on plain-http LAN pages
         name: p.name,
         qty: p.qty,
         unit: p.unit,
@@ -52,7 +57,7 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
   function save() {
     setError(null);
     if (!name.trim()) {
-      setError("Give the recipe a name.");
+      setError(tr("giveRecipeName"));
       return;
     }
     const ingredients = rows
@@ -71,7 +76,7 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
         router.push("/recipes");
         router.refresh();
       } catch {
-        setError("Could not save. Try again.");
+        setError(tr("couldNotSave"));
       }
     });
   }
@@ -91,21 +96,21 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
         <button
           type="button"
           onClick={() => router.push("/recipes")}
-          aria-label="Back to recipes"
-          className="grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+          aria-label={tr("backToRecipes")}
+          className="grid size-11 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="text-xl font-semibold tracking-tight">
-          {initial ? "Edit recipe" : "New recipe"}
+          {initial ? tr("editRecipe") : tr("newRecipe")}
         </h1>
       </div>
 
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Recipe name — e.g. Meatloaf"
-        aria-label="Recipe name"
+        placeholder={tr("recipeNamePlaceholder")}
+        aria-label={tr("recipeName")}
         className="h-12 rounded-2xl border border-hairline bg-surface px-4 text-base font-medium text-fg outline-none focus:border-brand"
       />
 
@@ -119,14 +124,14 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
               addFromQuick();
             }
           }}
-          placeholder="Add ingredients — 2kg flour, 3 eggs, salt"
-          aria-label="Add ingredients"
+          placeholder={tr("addIngredientsPlaceholder")}
+          aria-label={tr("addIngredients")}
           className="min-w-0 flex-1 bg-transparent px-3 py-2 text-fg outline-none placeholder:text-muted"
         />
         <button
           type="button"
           onClick={addFromQuick}
-          aria-label="Add ingredients"
+          aria-label={tr("addIngredients")}
           className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg transition-colors hover:bg-hairline"
         >
           <Plus className="size-5" strokeWidth={2.6} />
@@ -144,15 +149,15 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
                 <input
                   value={row.name}
                   onChange={(e) => patch(row.key, { name: e.target.value })}
-                  placeholder="Ingredient"
-                  aria-label="Ingredient name"
+                  placeholder={tr("ingredient")}
+                  aria-label={tr("ingredient")}
                   className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-fg outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => remove(row.key)}
-                  aria-label={`Remove ${row.name || "ingredient"}`}
-                  className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-over/10 hover:text-over"
+                  aria-label={`${tr("remove")} ${row.name || tr("ingredient")}`}
+                  className="grid size-11 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-over/10 hover:text-over"
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -165,26 +170,26 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
                     const v = e.target.value.replace(",", ".");
                     patch(row.key, { qty: v === "" ? null : Number(v) });
                   }}
-                  placeholder="Qty"
-                  aria-label="Quantity"
+                  placeholder={tr("qtyShort")}
+                  aria-label={tr("quantity")}
                   className="w-16 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm text-fg outline-none focus:border-brand"
                 />
                 <input
                   value={row.unit ?? ""}
                   onChange={(e) => patch(row.key, { unit: e.target.value || null })}
-                  placeholder="Unit"
-                  aria-label="Unit"
+                  placeholder={tr("unit")}
+                  aria-label={tr("unit")}
                   className="w-20 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm text-fg outline-none focus:border-brand"
                 />
                 <select
                   value={row.categoryKey}
                   onChange={(e) => patch(row.key, { categoryKey: e.target.value })}
-                  aria-label="Category"
+                  aria-label={tr("aisle")}
                   className="min-w-0 flex-1 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm text-fg outline-none focus:border-brand"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.key} value={c.key}>
-                      {c.label}
+                      {categoryLabel(lang, c.key, c.label)}
                     </option>
                   ))}
                 </select>
@@ -201,16 +206,16 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
           type="button"
           onClick={save}
           disabled={pending}
-          className="h-12 flex-1 rounded-2xl bg-brand text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="h-12 flex-1 rounded-2xl bg-brand text-base font-semibold text-on-brand transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          {pending ? "Saving…" : initial ? "Save changes" : "Create recipe"}
+          {pending ? tr("saving") : initial ? tr("saveChanges") : tr("createRecipe")}
         </button>
         {initial && (
           <button
             type="button"
             onClick={onDelete}
             disabled={pending}
-            aria-label="Delete recipe"
+            aria-label={tr("deleteRecipe")}
             className="grid size-12 shrink-0 place-items-center rounded-2xl border border-hairline text-over transition-colors hover:bg-over/10 disabled:opacity-60"
           >
             <Trash2 className="size-5" />

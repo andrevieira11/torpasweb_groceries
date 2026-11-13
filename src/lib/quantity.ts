@@ -71,3 +71,9 @@ export function formatQuantity(qty: number | null, unit: string | null): string 
   }
   return `${n} ${unit}`;
 }
+
+/** What a row shows: like formatQuantity, but a plain "×1" is just clutter, so it shows nothing. */
+export function displayQuantity(qty: number | null, unit: string | null): string {
+  if (qty === 1 && (!unit || unit === "x" || unit === "×")) return "";
+  return formatQuantity(qty, unit);
+}

@@ -1,18 +1,24 @@
-import { ShoppingBasket } from "lucide-react";
+import { cookies } from "next/headers";
 import { requireSession } from "@/lib/session";
-import { getActiveList, getListItems, getUserLists } from "@/lib/queries/lists";
+import {
+  ensureDishRows,
+  getActiveList,
+  getListDishes,
+  getListItems,
+  getListPeople,
+  getUserLists,
+} from "@/lib/queries/lists";
 import { getActiveShareTokens } from "@/lib/queries/sharing";
-import { CATEGORIES } from "@/lib/categories";
+import { getRecipesWithLines } from "@/lib/queries/recipes";
 import { AddBar } from "@/components/AddBar";
-import { CategoryGroup } from "@/components/CategoryGroup";
-import { SectionGroup } from "@/components/SectionGroup";
 import { ClearCheckedButton } from "@/components/ClearCheckedButton";
 import { ListMenu } from "@/components/ListMenu";
+import { BoardProvider } from "@/components/board/BoardProvider";
+import { ListBoard } from "@/components/board/ListBoard";
 import { getLang } from "@/lib/i18n/server";
-import { categoryLabel, itemNames, t, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
-import { cookies } from "next/headers";
-import { SectionsProvider, ViewToggle } from "@/components/ListUi";
+import { itemNames, listLabel, TIPS_COOKIE, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
 import { fillMissingTranslations } from "@/lib/i18n/backfill";
+import type { Board } from "@/lib/items/board";
 
 export default async function ListPage() {
   const session = await requireSession();
@@ -20,114 +26,82 @@ export default async function ListPage() {
   const isOwner = active.ownerId === session.user.id;
 
   const lang = await getLang();
-  const view: View = (await cookies()).get(VIEW_COOKIE)?.value === "dish" ? "dish" : "aisle";
-  const [userLists, rawRows, tokens] = await Promise.all([
+  const jar = await cookies();
+  const view: View = jar.get(VIEW_COOKIE)?.value === "dish" ? "dish" : "aisle";
+  const tips = jar.get(TIPS_COOKIE)?.value !== "off";
+  const [userLists, rawRows, tokens, rawDishes, people] = await Promise.all([
     getUserLists(session.user.id),
     getListItems(active.id),
     isOwner
       ? getActiveShareTokens(active.id)
       : Promise.resolve({} as { guest?: string; member_invite?: string }),
+    getListDishes(active.id),
+    getListPeople(active),
   ]);
+  // Everyone on the list can start a dish from anyone's recipes (read-only for the others).
+  const recipes = await getRecipesWithLines(people.map((p) => p.id));
 
   const rows = await fillMissingTranslations(rawRows);
+  const healed = await ensureDishRows(
+    active.id,
+    rows.map((r) => r.section),
+    rawDishes.map((d) => d.name),
+  );
+  const dishes = healed ? await getListDishes(active.id) : rawDishes;
 
-  const toView = (r: (typeof rows)[number]) => ({
-    id: r.id,
-    ...itemNames(lang, r),
-    dish: r.section,
-    showDish: view === "aisle",
-    qty: r.qty,
-    unit: r.unit,
-    categoryKey: r.categoryKey,
-    checked: r.checked,
-  });
-  const byCategory = (list: typeof rows) =>
-    CATEGORIES.map((category) => ({
-      category,
-      items: list.filter((r) => r.categoryKey === category.key).map(toView),
-    })).filter((g) => g.items.length > 0);
-
-  // Items without a section first (as before), then one collapsible card per section,
-  // in the order each section was first used.
-  // Aisle view (default, for shopping): everything by store aisle, items tagged with their dish.
-  // Dish view: unsectioned items first, then one collapsible card per dish.
-  const groups = byCategory(view === "aisle" ? rows : rows.filter((r) => !r.section));
-  const sectionNames: string[] = [];
-  for (const r of [...rows].sort((a, b) => +a.createdAt - +b.createdAt)) {
-    if (r.section && !sectionNames.includes(r.section)) sectionNames.push(r.section);
-  }
-  const sections = (view === "aisle" ? [] : sectionNames).map((name) => ({
-    name,
-    categories: byCategory(rows.filter((r) => r.section === name)).map(({ category, items }) => ({
-      key: category.key,
-      label: categoryLabel(lang, category.key, category.label),
-      color: category.color,
-      icon: category.icon,
-      items,
+  // One flat model for the client; "By aisle" and "By dish" are derived from it there, so
+  // switching views and every dish edit are instant (see components/board).
+  const board: Board = {
+    items: rows.map((r) => ({
+      id: r.id,
+      ...itemNames(lang, r),
+      normalizedName: r.normalizedName,
+      dish: r.section,
+      qty: r.qty,
+      unit: r.unit,
+      categoryKey: r.categoryKey,
+      checked: r.checked,
     })),
-  }));
-
-  const checkedCount = rows.filter((r) => r.checked).length;
+    dishes: dishes.map((d) => ({ id: d.id, name: d.name, emoji: d.emoji })),
+  };
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <ListMenu
-          active={{
-            id: active.id,
-            name: active.name,
-            isDefault: active.isDefault,
-            expiresAt: active.expiresAt ? active.expiresAt.toISOString() : null,
-            role: isOwner ? "owner" : "member",
-          }}
-          lists={userLists.map((l) => ({
-            id: l.id,
-            name: l.name,
-            isDefault: l.isDefault,
-            expiresAt: l.expiresAt ? l.expiresAt.toISOString() : null,
-          }))}
-          tokens={tokens}
-        />
-        {checkedCount > 0 && <ClearCheckedButton listId={active.id} count={checkedCount} />}
-      </div>
-
-      <AddBar listId={active.id} />
-
-      {sectionNames.length > 0 && <ViewToggle view={view} />}
-
-      <SectionsProvider sections={sectionNames}>
-      {groups.length === 0 && sections.length === 0 ? (
-        <div className="mt-2 flex flex-col items-center gap-3 rounded-3xl border border-hairline bg-surface px-6 py-14 text-center">
-          <div className="grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted">
-            <ShoppingBasket className="size-7" />
-          </div>
-          <p className="text-base font-medium">{t(lang, "emptyTitle")}</p>
-          <p className="max-w-[18rem] text-sm text-muted">
-            {t(lang, "emptyBody")}
-          </p>
+    <BoardProvider
+      key={active.id}
+      listId={active.id}
+      listOwnerId={active.ownerId}
+      board={board}
+      recipes={recipes.map((r) => ({ ...r, mine: r.ownerId === session.user.id }))}
+      initialView={view}
+      initialTips={tips}
+    >
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-2">
+          <ListMenu
+            active={{
+              id: active.id,
+              name: listLabel(lang, active),
+              isDefault: active.isDefault,
+              expiresAt: active.expiresAt ? active.expiresAt.toISOString() : null,
+              role: isOwner ? "owner" : "member",
+              ownerName: isOwner ? null : (userLists.find((l) => l.id === active.id)?.ownerName ?? null),
+            }}
+            lists={userLists.map((l) => ({
+              id: l.id,
+              name: listLabel(lang, l),
+              isDefault: l.isDefault,
+              expiresAt: l.expiresAt ? l.expiresAt.toISOString() : null,
+              ownerName: l.ownerName,
+            }))}
+            tokens={tokens}
+          />
+          <ClearCheckedButton />
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {groups.map(({ category, items }) => (
-            <CategoryGroup
-              key={category.key}
-              label={categoryLabel(lang, category.key, category.label)}
-              color={category.color}
-              icon={category.icon}
-              items={items}
-            />
-          ))}
-          {sections.map((sec) => (
-            <SectionGroup key={sec.name} listId={active.id} name={sec.name} categories={sec.categories} />
-          ))}
-          {sectionNames.length === 0 && (
-            <p className="px-2 text-xs text-muted">
-              {t(lang, "sectionTip")}
-            </p>
-          )}
-        </div>
-      )}
-      </SectionsProvider>
-    </section>
+
+        <AddBar />
+
+        <ListBoard />
+      </section>
+    </BoardProvider>
   );
 }

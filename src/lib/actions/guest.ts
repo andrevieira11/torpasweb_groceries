@@ -68,9 +68,10 @@ export async function guestAddItems(input: {
   return res;
 }
 
-export async function guestToggleItem(input: { token: string; itemId: string }) {
-  const { token, itemId } = z
-    .object({ token: z.string().min(1), itemId: z.string().min(1) })
+/** Tick or untick — the desired state, so two people ticking the same item never cancel out. */
+export async function guestToggleItem(input: { token: string; itemId: string; checked: boolean }) {
+  const { token, itemId, checked } = z
+    .object({ token: z.string().min(1), itemId: z.string().min(1), checked: z.boolean() })
     .parse(input);
 
   throttle(token);
@@ -79,7 +80,6 @@ export async function guestToggleItem(input: { token: string; itemId: string }) 
   const [item] = await db.select().from(items).where(eq(items.id, itemId)).limit(1);
   if (!item || item.listId !== list.id) throw new Error("Not found"); // must belong to the token's list
 
-  const checked = !item.checked;
   await db
     .update(items)
     .set({ checked, checkedAt: checked ? new Date() : null, updatedAt: new Date() })

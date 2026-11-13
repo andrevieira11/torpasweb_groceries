@@ -15,11 +15,14 @@ import {
   Share2,
   Trash2,
   UserPlus,
+  Users,
 } from "lucide-react";
+import { fill } from "@/lib/i18n/strings";
 import { createList, deleteList, leaveList, setActiveList } from "@/lib/actions/lists";
 import { createGuestLink, createInviteLink, revokeShareLink } from "@/lib/actions/sharing";
 
-type ListLite = { id: string; name: string; isDefault: boolean; expiresAt: string | null };
+/** `ownerName` is set when someone else owns the list (shown as "My list · André"). */
+type ListLite = { id: string; name: string; isDefault: boolean; expiresAt: string | null; ownerName: string | null };
 type Active = ListLite & { role: "owner" | "member" };
 type Tokens = { guest?: string; member_invite?: string };
 
@@ -40,6 +43,7 @@ export function ListMenu({
   tokens: Tokens;
 }) {
   const router = useRouter();
+  const tr = useT();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"home" | "new" | "share">("home");
   const [pending, startTransition] = useTransition();
@@ -60,9 +64,11 @@ export function ListMenu({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-w-0 items-center gap-1.5"
+        className="flex min-h-11 min-w-0 items-center gap-1.5"
       >
+        {active.ownerName && <Users className="size-5 shrink-0 text-muted" aria-hidden />}
         <span className="truncate text-2xl font-semibold tracking-tight">{active.name}</span>
+        {active.ownerName && <span className="sr-only">{fill(tr("sharedBy"), { name: active.ownerName })}</span>}
         <ChevronDown className="size-5 shrink-0 text-muted" />
       </button>
 
@@ -150,8 +156,8 @@ function HomeView({
   const tr = useT();
   return (
     <div className="flex flex-col gap-1">
-      <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-        Lists
+      <p className="px-1 pb-1 text-xs font-semibold text-muted">
+        {tr("lists")}
       </p>
       <ul className="flex flex-col">
         {lists.map((l) => (
@@ -160,11 +166,21 @@ function HomeView({
               type="button"
               disabled={pending}
               onClick={() => onSwitch(l.id)}
-              className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
             >
-              <span className="flex-1 truncate text-[15px] font-medium">{l.name}</span>
+              {l.ownerName && <Users className="size-4 shrink-0 text-muted" aria-hidden />}
+              <span className={`min-w-0 flex-1 truncate text-[15px] ${l.id === active.id ? "font-semibold" : "font-medium"}`}>
+                {l.name}
+                {l.ownerName && (
+                  <span className="font-normal text-muted">
+                    {" · "}
+                    <span className="sr-only">{fill(tr("sharedBy"), { name: l.ownerName })}</span>
+                    <span aria-hidden>{l.ownerName}</span>
+                  </span>
+                )}
+              </span>
               {l.expiresAt && <Expiry iso={l.expiresAt} />}
-              {l.id === active.id && <Check className="size-4 text-brand" />}
+              {l.id === active.id && <Check className="size-4 text-brand" aria-hidden />}
             </button>
           </li>
         ))}
@@ -239,7 +255,7 @@ function NewView({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder={tr("listNamePlaceholder")}
-        aria-label="List name"
+        aria-label={tr("listName")}
         className="h-12 rounded-2xl border border-hairline bg-bg px-4 text-base text-fg outline-none focus:border-brand"
       />
       <div className="flex flex-wrap gap-2">
@@ -262,15 +278,15 @@ function NewView({
           onClick={onBack}
           className="h-11 flex-1 rounded-2xl border border-hairline text-sm font-semibold text-muted"
         >
-          Back
+          {tr("back")}
         </button>
         <button
           type="button"
           disabled={pending || !name.trim()}
           onClick={() => onCreate(name.trim(), days)}
-          className="h-11 flex-1 rounded-2xl bg-brand text-sm font-semibold text-white disabled:opacity-50"
+          className="h-11 flex-1 rounded-2xl bg-brand text-sm font-semibold text-on-brand disabled:opacity-50"
         >
-          Create
+          {tr("create")}
         </button>
       </div>
     </div>
@@ -339,7 +355,7 @@ function ShareView({
           }
           className="px-1 text-left text-sm font-medium text-over"
         >
-          Revoke all links
+          {tr("revokeLinks")}
         </button>
       )}
 
@@ -348,7 +364,7 @@ function ShareView({
         onClick={onBack}
         className="h-11 rounded-2xl border border-hairline text-sm font-semibold text-muted"
       >
-        Back
+        {tr("back")}
       </button>
     </div>
   );
@@ -406,9 +422,9 @@ function LinkRow({
           type="button"
           disabled={pending}
           onClick={onCreate}
-          className="mt-2 w-full rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-2 w-full rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-on-brand disabled:opacity-50"
         >
-          Create link
+          {tr("createLink")}
         </button>
       )}
     </div>

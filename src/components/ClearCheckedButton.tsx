@@ -1,34 +1,25 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { clearChecked } from "@/lib/actions/items";
+import { useBoard } from "./board/BoardProvider";
 import { useT } from "./LangProvider";
 
-export function ClearCheckedButton({
-  listId,
-  count,
-}: {
-  listId: string;
-  count: number;
-}) {
+/** "Clear done (n)" — removes bought items (and dishes that are fully bought), with Undo. */
+export function ClearCheckedButton() {
   const tr = useT();
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { board, clearDone } = useBoard();
+  const count = board.items.filter((i) => i.checked).length;
+  if (count === 0) return null;
 
   return (
     <button
       type="button"
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          await clearChecked({ listId });
-          router.refresh();
-        })
-      }
-      className="text-sm font-medium text-muted transition-colors hover:text-fg disabled:opacity-50"
+      onClick={clearDone}
+      aria-label={`${tr("clearDone")} (${count})`}
+      className="min-h-11 shrink-0 px-1 text-sm font-medium text-muted transition-colors hover:text-fg"
     >
-      {tr("clearDone")} ({count})
+      {/* the short word on narrow phones, so the list name keeps its room */}
+      <span className="min-[400px]:hidden">{tr("clearShort")}</span>
+      <span className="hidden min-[400px]:inline">{tr("clearDone")}</span> ({count})
     </button>
   );
 }

@@ -33,10 +33,13 @@ export function LangToggle() {
         start(() => router.refresh());
       }}
       aria-label={t(lang, "switchLang")}
-      className={`flex h-9 items-center rounded-full border border-hairline px-1 text-xs font-semibold ${pending ? "opacity-60" : ""}`}
+      className={`mr-1 flex h-11 items-center rounded-full px-0.5 text-xs font-semibold ${pending ? "opacity-60" : ""}`}
     >
-      <span className={`rounded-full px-2 py-1 ${lang === "pt" ? "bg-brand text-white" : "text-muted"}`}>PT</span>
-      <span className={`rounded-full px-2 py-1 ${lang === "en" ? "bg-brand text-white" : "text-muted"}`}>EN</span>
+      {/* the current language is a filled pill AND bold; the other is plain — not colour alone */}
+      <span className="flex h-9 items-center rounded-full border border-hairline px-1">
+        <span className={`rounded-full px-2 py-1 ${lang === "pt" ? "bg-brand text-on-brand" : "font-medium text-muted"}`}>PT</span>
+        <span className={`rounded-full px-2 py-1 ${lang === "en" ? "bg-brand text-on-brand" : "font-medium text-muted"}`}>EN</span>
+      </span>
     </button>
   );
 }

@@ -2,6 +2,8 @@ import { mergeQuantities } from "@/lib/quantity";
 
 /** An item to add to a list, with its category already decided. */
 export type IncomingItem = {
+  /** Optional caller-chosen row id (the browser's optimistic id); kept on the insert. */
+  id?: string;
   name: string;
   normalizedName: string;
   qty: number | null;
@@ -14,6 +16,8 @@ export type ExistingItem = {
   normalizedName: string;
   qty: number | null;
   unit: string | null;
+  /** The row's other names, normalized (its PT/EN translations): "2 ovos" merges into "eggs". */
+  aliases?: (string | null | undefined)[];
 };
 
 export type MergePlan = {
@@ -30,15 +34,16 @@ export function planMerge(
   incoming: IncomingItem[],
   existing: ExistingItem[],
 ): MergePlan {
-  const byNorm = new Map<
-    string,
-    { id: string; qty: number | null; unit: string | null }
-  >();
-  for (const e of existing) {
-    if (!byNorm.has(e.normalizedName)) {
-      byNorm.set(e.normalizedName, { id: e.id, qty: e.qty, unit: e.unit });
-    }
-  }
+  type Ref = { id: string; qty: number | null; unit: string | null };
+  const byNorm = new Map<string, Ref>();
+  const refs: Ref[] = existing.map((e) => ({ id: e.id, qty: e.qty, unit: e.unit }));
+  existing.forEach((e, i) => {
+    if (!byNorm.has(e.normalizedName)) byNorm.set(e.normalizedName, refs[i]);
+  });
+  // Then each row's names in the other language — a typed name always wins over an alias.
+  existing.forEach((e, i) => {
+    for (const a of e.aliases ?? []) if (a && !byNorm.has(a)) byNorm.set(a, refs[i]);
+  });
 
   const updates: MergePlan["updates"] = [];
   const inserts: IncomingItem[] = [];

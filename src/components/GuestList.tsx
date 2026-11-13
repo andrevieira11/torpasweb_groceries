@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Check, Plus } from "lucide-react";
@@ -50,7 +50,7 @@ export function GuestList({
   return (
     <div className="flex flex-col gap-4 py-3">
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">Shared list</span>
+        <span className="text-xs font-medium text-muted">Shared list</span>
         <h1 className="text-2xl font-semibold tracking-tight">{listName}</h1>
       </div>
 
@@ -81,7 +81,7 @@ export function GuestList({
           type="submit"
           disabled={pending || !text.trim()}
           aria-label="Add"
-          className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white transition-opacity disabled:opacity-40"
+          className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-on-brand transition-opacity disabled:opacity-40"
         >
           <Plus className="size-5" strokeWidth={2.6} />
         </button>
@@ -118,20 +118,21 @@ export function GuestList({
 
 function GuestItemRow({ token, item }: { token: string; item: GItem }) {
   const router = useRouter();
-  const [checked, setChecked] = useState(item.checked);
+  // The server's tick, with this guest's tap layered on top until it lands — so a tick made by
+  // someone else shows after the refresh too (useState(prop) never re-synced), and a failed
+  // tap simply falls back to the server's value.
+  const [checked, setOptimistic] = useOptimistic(item.checked);
   const [, startTransition] = useTransition();
   const qty = formatQuantity(item.qty, item.unit);
 
   function toggle() {
     const next = !checked;
-    setChecked(next);
     startTransition(async () => {
+      setOptimistic(next);
       try {
-        await guestToggleItem({ token, itemId: item.id });
-        router.refresh();
-      } catch {
-        setChecked(!next);
-      }
+        await guestToggleItem({ token, itemId: item.id, checked: next });
+      } catch {}
+      router.refresh();
     });
   }
 
@@ -140,7 +141,7 @@ function GuestItemRow({ token, item }: { token: string; item: GItem }) {
       <motion.span
         whileTap={{ scale: 0.88 }}
         className={`grid size-6 shrink-0 place-items-center rounded-full border transition-colors ${
-          checked ? "border-brand bg-brand text-white" : "border-hairline bg-surface text-transparent"
+          checked ? "border-brand bg-brand text-on-brand" : "border-hairline bg-surface text-transparent"
         }`}
       >
         <Check className="size-3.5" strokeWidth={3} />

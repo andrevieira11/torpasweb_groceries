@@ -1,3 +1,5 @@
+import { normalizeName } from "@/lib/parse/normalize";
+
 /** Portuguese → English grocery pairs (display forms, with accents). Normalized at load. */
 export const PT_EN: [string, string][] = [
   ["leite", "milk"], ["ovos", "eggs"], ["ovo", "egg"], ["pão", "bread"], ["manteiga", "butter"], ["queijo", "cheese"],
@@ -33,3 +35,24 @@ export const PT_EN: [string, string][] = [
   ["descascador", "vegetable peeler"], ["lichias em lata", "canned lychees"], ["doces", "sweet munchies"], ["coca-cola", "coca-cola"],
   ["coca-cola zero", "coca-cola zero"], ["tortilla chips", "tortilla chips"], ["pepperoni", "pepperoni"], ["sacos de gelo", "bags of ice"],
 ];
+
+let byKey: Map<string, string[]> | null = null;
+
+/**
+ * The same grocery word in the other language, normalized ("egg" → ["ovo"], "ovo" → ["egg"]),
+ * from the built-in pairs. Lets "2 ovos" merge into "eggs ×3" even when "eggs" was typed in
+ * the Portuguese app (so it has no Portuguese name of its own). Pure; used client + server.
+ */
+export function dictionaryAliases(normalizedName: string): string[] {
+  if (!byKey) {
+    byKey = new Map();
+    for (const [pt, en] of PT_EN) {
+      const p = normalizeName(pt);
+      const e = normalizeName(en);
+      if (p === e) continue;
+      byKey.set(p, [...(byKey.get(p) ?? []), e]);
+      byKey.set(e, [...(byKey.get(e) ?? []), p]);
+    }
+  }
+  return byKey.get(normalizedName) ?? [];
+}

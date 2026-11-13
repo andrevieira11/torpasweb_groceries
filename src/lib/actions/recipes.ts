@@ -1,15 +1,17 @@
 "use server";
 
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { recipeIngredients, recipes } from "@/db/schema";
+import { listDishes, recipeIngredients, recipes } from "@/db/schema";
 import { getSession } from "@/lib/session";
-import { getOrCreateDefaultList } from "@/lib/queries/lists";
+import { getActiveList } from "@/lib/queries/lists";
+import { canonicalDish } from "@/lib/items/sections";
 import { applyItems } from "@/lib/items/add";
 import { cleanDisplayName, normalizeName } from "@/lib/parse";
 import { CATEGORY_KEYS } from "@/lib/categories";
+import { getLang } from "@/lib/i18n/server";
 
 async function requireUser() {
   const session = await getSession();
@@ -108,8 +110,11 @@ export async function deleteRecipe(input: { id: string }) {
   revalidatePath("/recipes");
 }
 
-/** Expand a recipe's ingredients into the user's default list (with merge). */
-export async function addRecipeToList(input: { recipeId: string }) {
+/**
+ * "Add as dish" on the Recipes tab: the recipe's ingredients land in the active list as a dish
+ * named after the recipe (merging into that dish if it is already there — adding twice doubles).
+ */
+export async function addRecipeAsDish(input: { recipeId: string }) {
   const { recipeId } = z.object({ recipeId: z.string().min(1) }).parse(input);
   const user = await requireUser();
 
@@ -120,11 +125,16 @@ export async function addRecipeToList(input: { recipeId: string }) {
     .limit(1);
   if (!recipe) throw new Error("Recipe not found");
 
-  const list = await getOrCreateDefaultList(user.id);
-  const ings = await db
-    .select()
-    .from(recipeIngredients)
-    .where(eq(recipeIngredients.recipeId, recipeId));
+  const list = await getActiveList(user.id);
+  const [ings, dishes] = await Promise.all([
+    db
+      .select()
+      .from(recipeIngredients)
+      .where(eq(recipeIngredients.recipeId, recipeId))
+      .orderBy(asc(recipeIngredients.sortOrder)),
+    db.select({ name: listDishes.name }).from(listDishes).where(eq(listDishes.listId, list.id)),
+  ]);
+  const dish = canonicalDish(recipe.name, dishes.map((d) => d.name)) ?? "Recipe";
 
   const res = await applyItems(
     list.id,
@@ -136,8 +146,16 @@ export async function addRecipeToList(input: { recipeId: string }) {
       categoryKey: g.categoryKey,
     })),
     user.id,
+    null,
+    dish,
+    await getLang(),
   );
+  const [row] = await db
+    .select({ id: listDishes.id })
+    .from(listDishes)
+    .where(and(eq(listDishes.listId, list.id), eq(listDishes.name, dish)));
 
   revalidatePath("/");
-  return { ...res, recipe: recipe.name };
+  revalidatePath("/recipes");
+  return { ...res, dish, dishId: row?.id ?? null };
 }

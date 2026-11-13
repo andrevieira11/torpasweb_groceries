@@ -83,7 +83,7 @@ export default function SignInPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-1 h-12 rounded-2xl bg-brand text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="mt-1 h-12 rounded-2xl bg-brand text-base font-semibold text-on-brand transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {busy ? "…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
