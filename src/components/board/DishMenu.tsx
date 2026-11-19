@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BookmarkPlus, ChevronRight, CircleAlert, Pencil, Trash2 } from "lucide-react";
+import { BookmarkPlus, ChevronRight, CircleAlert, ListMinus, Pencil } from "lucide-react";
 import { dishView, type BoardDish, type DishGroup } from "@/lib/items/board";
 import { autoEmoji, dishTitle } from "@/lib/items/dish-emoji";
 import { cleanSection, sameDish } from "@/lib/items/sections";
@@ -61,10 +61,9 @@ export function DishMenu({
           />
           <div className="my-1 border-t border-hairline" />
           <MenuRow
-            danger
-            icon={<Trash2 className="size-5" />}
+            icon={<ListMinus className="size-5" />}
             label={tr("removeDish")}
-            hint={n === 0 ? tr("canUndo") : n === 1 ? tr("removeDishHintOne") : fill(tr("removeDishHint"), { n })}
+            hint={`${n === 0 ? tr("canUndo") : n === 1 ? tr("removeDishHintOne") : fill(tr("removeDishHint"), { n })}${hasRecipe ? ` · ${tr("recipeStays")}` : ""}`}
             onClick={() => {
               removeDish(dish.id);
               onClose();

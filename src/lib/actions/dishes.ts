@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
 import { categorizeRules, items, listDishes, recipeIngredients, recipes } from "@/db/schema";
@@ -197,6 +197,35 @@ export async function removeDish(input: { listId: string; dishId: string }) {
   revalidatePath("/");
   if (!removed) return GONE;
   return { ok: true as const, undo: removalToken(user.id, list.id, removed) };
+}
+
+/**
+ * "Take all dishes off" (Andre, 2026-11-19): every dish on the list and its ingredients go in one go,
+ * with ONE Undo. Loose items stay. Recipes are never touched — they live in the Recipes tab and can
+ * only be deleted there. Same lock order as clearChecked (dish rows by id, then items).
+ */
+export async function removeAllDishes(input: { listId: string }) {
+  const p = z.object({ listId }).parse(input);
+  const user = await requireUser();
+  const list = await listFor(user.id, p.listId);
+  const removed = await db.transaction(async (tx) => {
+    const ds = await tx
+      .select()
+      .from(listDishes)
+      .where(eq(listDishes.listId, list.id))
+      .orderBy(asc(listDishes.id))
+      .for("update");
+    if (ds.length === 0) return null;
+    const gone = await tx
+      .delete(items)
+      .where(and(eq(items.listId, list.id), inArray(items.section, ds.map((d) => d.name))))
+      .returning(itemSnapshot);
+    const dishes = await tx.delete(listDishes).where(eq(listDishes.listId, list.id)).returning(dishSnapshot);
+    return { items: gone, dishes, sectionIds: Object.fromEntries(ds.map((d) => [d.name, d.id])) };
+  });
+  revalidatePath("/");
+  if (!removed) return { ok: true as const, undo: null, count: 0 };
+  return { ok: true as const, undo: removalToken(user.id, list.id, removed), count: removed.dishes.length };
 }
 
 /**

@@ -24,6 +24,8 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
   const tr = useT();
   const lang = useLang();
   const [name, setName] = useState(initial?.name ?? "");
+  // Deleting a recipe asks first (2026-11-19): this is the ONLY place a recipe can be deleted.
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [rows, setRows] = useState<Row[]>(
     () => (initial?.ingredients ?? []).map((g, i) => ({ key: `init-${i}`, ...g })),
   );
@@ -213,7 +215,7 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
         {initial && (
           <button
             type="button"
-            onClick={onDelete}
+            onClick={() => setConfirmDelete(true)}
             disabled={pending}
             aria-label={tr("deleteRecipe")}
             className="grid size-12 shrink-0 place-items-center rounded-2xl border border-hairline text-over transition-colors hover:bg-over/10 disabled:opacity-60"
@@ -222,6 +224,18 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
           </button>
         )}
       </div>
+      {initial && confirmDelete && (
+        <div className="rounded-3xl border border-over/40 bg-surface p-4" role="alertdialog" aria-label={tr("deleteRecipeAsk")}>
+          <p className="text-[15px] font-semibold">{tr("deleteRecipeAsk")}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setConfirmDelete(false)} className="min-h-11 rounded-2xl border border-hairline text-[15px]">{tr("cancel")}</button>
+            <button type="button" onClick={onDelete} disabled={pending}
+              className="flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-over text-[15px] font-semibold text-white disabled:opacity-60">
+              <Trash2 className="size-4" /> {tr("deleteRecipeYes")}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

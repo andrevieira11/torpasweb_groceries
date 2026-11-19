@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Plus, ShoppingBasket, X } from "lucide-react";
+import { ListMinus, Plus, ShoppingBasket, X } from "lucide-react";
 import { byAisle, dishView, type BoardDish, type BoardItem } from "@/lib/items/board";
 import { getCategory } from "@/lib/categories";
-import { categoryLabel, type View } from "@/lib/i18n/strings";
+import { categoryLabel, fill, type View } from "@/lib/i18n/strings";
 import { CategoryGroup } from "../CategoryGroup";
 import { useLang, useT } from "../LangProvider";
 import { useToastControls } from "../Toast";
-import { useBoard } from "./BoardProvider";
+import { isOrphan, useBoard } from "./BoardProvider";
 import { DishCard, LooseCard } from "./DishCard";
 import { DishMenu } from "./DishMenu";
 import { NewDishSheet } from "./NewDishSheet";
@@ -236,8 +236,37 @@ function DishesView({ onNewDish, onMenu }: { onNewDish: () => void; onMenu: (id:
         <Plus className="size-5 text-brand" strokeWidth={2.6} aria-hidden />
         {tr("newDish")}
       </motion.button>
+      {dishes.filter((d) => !isOrphan(d)).length > 0 && <TakeAllOff n={dishes.filter((d) => !isOrphan(d)).length} />}
       {/* room for the floating ＋ button at the very end of the list */}
       <div className="h-14" aria-hidden />
+    </div>
+  );
+}
+
+/**
+ * "Take all dishes off the list" (2026-11-19): one quiet button at the bottom of By dish, asks once,
+ * then every dish + its ingredients go with ONE Undo. Recipes stay in the Recipes tab.
+ */
+function TakeAllOff({ n }: { n: number }) {
+  const tr = useT();
+  const { removeAllDishes } = useBoard();
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <button type="button" onClick={() => setAsking(true)}
+        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold text-muted transition-colors hover:text-fg">
+        <ListMinus className="size-4" aria-hidden /> {tr("removeAllDishes")}
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-3xl border border-hairline bg-surface p-4" role="group" aria-label={tr("removeAllDishes")}>
+      <p className="text-[15px] font-semibold">{fill(tr("removeAllDishesAsk"), { n })}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-2xl border border-hairline text-[15px]">{tr("cancel")}</button>
+        <button type="button" onClick={() => { setAsking(false); removeAllDishes(); }}
+          className="min-h-11 rounded-2xl bg-fg text-[15px] font-semibold text-bg">{tr("removeAllDishesYes")}</button>
+      </div>
     </div>
   );
 }

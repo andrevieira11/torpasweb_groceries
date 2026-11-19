@@ -29,6 +29,7 @@ import {
 import {
   addToDish as addToDishAction,
   createDish as createDishAction,
+  removeAllDishes as removeAllDishesAction,
   removeDish as removeDishAction,
   renameDish as renameDishAction,
   restoreRemoved,
@@ -61,6 +62,8 @@ type BoardApi = {
   /** False when ignored (a second tap right after a removal). */
   removeItem: (item: BoardItem) => boolean;
   removeDish: (id: string) => void;
+  /** Every dish and its ingredients off the list, one Undo; loose items and recipes stay. */
+  removeAllDishes: () => void;
   renameDish: (id: string, to: string, emoji: string | null) => void;
   saveAsRecipe: (id: string) => void;
   clearDone: () => void;
@@ -355,6 +358,26 @@ export function BoardProvider({
     });
   }
 
+  function removeAllDishes() {
+    const dishes = board.dishes.map((dish, at) => ({ dish: settledDish(dish), at })).filter(({ dish }) => !isOrphan(dish));
+    if (dishes.length === 0) return;
+    const names = new Set(dishes.map(({ dish }) => dish.name));
+    const items = board.items
+      .map((item, i) => ({ item: settled(item), at: i, dishId: dishes.find(({ dish }) => dish.name === item.dish)?.dish.id }))
+      .filter((x) => x.item.dish !== null && names.has(x.item.dish));
+    const n = dishes.length;
+    const token = run(
+      dishes.map(({ dish }) => ({ kind: "removeDish" as const, id: dish.id })),
+      () => removeAllDishesAction({ listId }),
+    );
+    offerUndo({
+      full: n === 1 ? fill(tr("removedDish"), { name: dishes[0].dish.name }) : fill(tr("removedAllDishes"), { n }),
+      short: fill(tr("dishesShort"), { n }),
+      restore: { kind: "restore", items, dishes },
+      token,
+    });
+  }
+
   function renameDish(id: string, to: string, emoji: string | null) {
     const clean = cleanSection(to);
     if (!clean) return;
@@ -450,6 +473,7 @@ export function BoardProvider({
         createDish,
         removeItem,
         removeDish,
+        removeAllDishes,
         renameDish,
         saveAsRecipe,
         clearDone,
