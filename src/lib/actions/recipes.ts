@@ -12,6 +12,7 @@ import { applyItems } from "@/lib/items/add";
 import { cleanDisplayName, normalizeName } from "@/lib/parse";
 import { CATEGORY_KEYS } from "@/lib/categories";
 import { getLang } from "@/lib/i18n/server";
+import { clampPeople, scaleQuantity } from "@/lib/recipes/scale";
 
 async function requireUser() {
   const session = await getSession();
@@ -28,6 +29,8 @@ const ingredientSchema = z.object({
 
 const recipeSchema = z.object({
   name: z.string().min(1).max(120),
+  /** How many people the amounts are for (2 unless said otherwise — Andre, 2026-11-19). */
+  servings: z.number().int().min(1).max(50).optional(),
   ingredients: z.array(ingredientSchema).max(100),
 });
 
@@ -44,7 +47,7 @@ function ingredientRows(recipeId: string, ingredients: z.infer<typeof ingredient
 }
 
 export async function createRecipe(input: z.infer<typeof recipeSchema>) {
-  const { name, ingredients } = recipeSchema.parse(input);
+  const { name, servings, ingredients } = recipeSchema.parse(input);
   const user = await requireUser();
 
   const [recipe] = await db
@@ -53,6 +56,7 @@ export async function createRecipe(input: z.infer<typeof recipeSchema>) {
       ownerId: user.id,
       name: cleanDisplayName(name),
       normalizedName: normalizeName(name),
+      servings: servings ?? 2,
     })
     .returning();
 
@@ -67,7 +71,7 @@ export async function createRecipe(input: z.infer<typeof recipeSchema>) {
 const updateSchema = recipeSchema.extend({ id: z.string().min(1) });
 
 export async function updateRecipe(input: z.infer<typeof updateSchema>) {
-  const { id, name, ingredients } = updateSchema.parse(input);
+  const { id, name, servings, ingredients } = updateSchema.parse(input);
   const user = await requireUser();
 
   const [existing] = await db
@@ -82,6 +86,7 @@ export async function updateRecipe(input: z.infer<typeof updateSchema>) {
     .set({
       name: cleanDisplayName(name),
       normalizedName: normalizeName(name),
+      ...(servings ? { servings } : {}),
       updatedAt: new Date(),
     })
     .where(eq(recipes.id, id));
@@ -113,9 +118,12 @@ export async function deleteRecipe(input: { id: string }) {
 /**
  * "Add as dish" on the Recipes tab: the recipe's ingredients land in the active list as a dish
  * named after the recipe (merging into that dish if it is already there — adding twice doubles).
+ * `people` scales the amounts from the recipe's servings (rounded up to what you can buy).
  */
-export async function addRecipeAsDish(input: { recipeId: string }) {
-  const { recipeId } = z.object({ recipeId: z.string().min(1) }).parse(input);
+export async function addRecipeAsDish(input: { recipeId: string; people?: number }) {
+  const { recipeId, people: asked } = z
+    .object({ recipeId: z.string().min(1), people: z.number().optional() })
+    .parse(input);
   const user = await requireUser();
 
   const [recipe] = await db
@@ -135,14 +143,14 @@ export async function addRecipeAsDish(input: { recipeId: string }) {
     db.select({ name: listDishes.name }).from(listDishes).where(eq(listDishes.listId, list.id)),
   ]);
   const dish = canonicalDish(recipe.name, dishes.map((d) => d.name)) ?? "Recipe";
+  const people = asked == null ? recipe.servings : clampPeople(asked);
 
   const res = await applyItems(
     list.id,
     ings.map((g) => ({
       name: g.name,
       normalizedName: g.normalizedName,
-      qty: g.qty,
-      unit: g.unit,
+      ...scaleQuantity({ qty: g.qty, unit: g.unit }, recipe.servings, people),
       categoryKey: g.categoryKey,
     })),
     user.id,
@@ -157,5 +165,5 @@ export async function addRecipeAsDish(input: { recipeId: string }) {
 
   revalidatePath("/");
   revalidatePath("/recipes");
-  return { ...res, dish, dishId: row?.id ?? null };
+  return { ...res, dish, dishId: row?.id ?? null, people };
 }

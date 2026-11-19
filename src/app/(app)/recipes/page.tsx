@@ -54,7 +54,7 @@ export default async function RecipesPage() {
         <ul className="flex flex-col gap-2">
           {recipes.map((r) => (
             <li key={r.id}>
-              <RecipeCard id={r.id} name={r.name} count={r.count} dishId={dishFor(r.name)} />
+              <RecipeCard id={r.id} name={r.name} count={r.count} servings={r.servings} dishId={dishFor(r.name)} />
             </li>
           ))}
         </ul>

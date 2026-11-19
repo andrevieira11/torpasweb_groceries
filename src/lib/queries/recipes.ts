@@ -22,6 +22,7 @@ export async function getRecipesWithCounts(ownerId: string) {
     .select({
       id: recipes.id,
       name: recipes.name,
+      servings: recipes.servings,
       count: sql<number>`count(${recipeIngredients.id})`.mapWith(Number),
     })
     .from(recipes)

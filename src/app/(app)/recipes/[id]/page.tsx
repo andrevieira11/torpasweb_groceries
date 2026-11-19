@@ -18,6 +18,7 @@ export default async function EditRecipePage({
       initial={{
         id: data.recipe.id,
         name: data.recipe.name,
+        servings: data.recipe.servings,
         ingredients: data.ingredients.map((g) => ({
           name: g.name,
           qty: g.qty,

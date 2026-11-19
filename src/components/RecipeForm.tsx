@@ -9,6 +9,7 @@ import { createRecipe, deleteRecipe, updateRecipe } from "@/lib/actions/recipes"
 import { newId } from "@/lib/ids";
 import { categoryLabel } from "@/lib/i18n/strings";
 import { useLang, useT } from "./LangProvider";
+import { PeopleStepper } from "./PeopleStepper";
 
 type Ingredient = {
   name: string;
@@ -17,13 +18,14 @@ type Ingredient = {
   categoryKey: string;
 };
 type Row = Ingredient & { key: string };
-type Initial = { id: string; name: string; ingredients: Ingredient[] };
+type Initial = { id: string; name: string; servings: number; ingredients: Ingredient[] };
 
 export function RecipeForm({ initial }: { initial?: Initial }) {
   const router = useRouter();
   const tr = useT();
   const lang = useLang();
   const [name, setName] = useState(initial?.name ?? "");
+  const [servings, setServings] = useState(initial?.servings ?? 2);
   // Deleting a recipe asks first (2026-11-19): this is the ONLY place a recipe can be deleted.
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rows, setRows] = useState<Row[]>(
@@ -73,8 +75,8 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
 
     startTransition(async () => {
       try {
-        if (initial) await updateRecipe({ id: initial.id, name: name.trim(), ingredients });
-        else await createRecipe({ name: name.trim(), ingredients });
+        if (initial) await updateRecipe({ id: initial.id, name: name.trim(), servings, ingredients });
+        else await createRecipe({ name: name.trim(), servings, ingredients });
         router.push("/recipes");
         router.refresh();
       } catch {
@@ -115,6 +117,11 @@ export function RecipeForm({ initial }: { initial?: Initial }) {
         aria-label={tr("recipeName")}
         className="h-12 rounded-2xl border border-hairline bg-surface px-4 text-base font-medium text-fg outline-none focus:border-brand"
       />
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-hairline bg-surface p-1.5 pl-4">
+        <span className="text-sm font-medium">{tr("recipeServes")}</span>
+        <PeopleStepper value={servings} onChange={setServings} disabled={pending} />
+      </div>
 
       <div className="flex items-center gap-2 rounded-2xl border border-hairline bg-surface p-1.5">
         <input

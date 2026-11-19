@@ -167,6 +167,15 @@ const S = {
   openDishFor: { en: "On the list — open “{name}”", pt: "Na lista — abrir “{name}”" },
   addAgain: { en: "Add again (×2)", pt: "Juntar outra vez (×2)" },
   addedAsDish: { en: "“{name}” is on the list", pt: "“{name}” está na lista" },
+  addedAsDishFor: { en: "“{name}” for {n} is on the list", pt: "“{name}” para {n} está na lista" },
+  forPeople: { en: "for {n}", pt: "para {n}" },
+  howManyPeople: { en: "How many people?", pt: "Quantas pessoas?" },
+  addForPeople: { en: "Add for {n}", pt: "Juntar para {n}" },
+  onePersonLess: { en: "One person less", pt: "Menos uma pessoa" },
+  onePersonMore: { en: "One more person", pt: "Mais uma pessoa" },
+  peopleCount: { en: "{n} people", pt: "{n} pessoas" },
+  personOne: { en: "1 person", pt: "1 pessoa" },
+  recipeServes: { en: "Amounts are for", pt: "Quantidades para" },
   newRecipe: { en: "New recipe", pt: "Nova receita" },
   editRecipe: { en: "Edit recipe", pt: "Editar receita" },
   backToRecipes: { en: "Back to recipes", pt: "Voltar às receitas" },
@@ -218,6 +227,11 @@ export function t(lang: Lang, key: StringKey): string {
 /** Fill "{name}"-style slots: fill(t(lang, "removedItem"), { name: "bacon" }). */
 export function fill(s: string, vars: Record<string, string | number>): string {
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+}
+
+/** "1 person" / "4 pessoas". */
+export function peopleCount(lang: Lang, n: number): string {
+  return n === 1 ? t(lang, "personOne") : fill(t(lang, "peopleCount"), { n });
 }
 
 /** "1 ingredient" / "3 ingredientes". */

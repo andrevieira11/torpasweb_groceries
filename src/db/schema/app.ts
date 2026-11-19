@@ -143,6 +143,8 @@ export const recipes = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     normalizedName: text("normalized_name").notNull(), // fuzzy "add <recipe>" match
+    /** How many people the quantities are for (2026-11-19: base 2; "how many people?" scales them). */
+    servings: integer("servings").notNull().default(2),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
