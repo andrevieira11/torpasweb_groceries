@@ -38,7 +38,7 @@ function getSpeechRecognition(): SpeechRecognitionLike | null {
 export function AddBar() {
   const tr = useT();
   const lang = useLang();
-  const { addText } = useBoard();
+  const { addText, store } = useBoard();
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
   const [listening, setListening] = useState(false);
@@ -93,7 +93,7 @@ export function AddBar() {
         value={name}
         onChange={(e) => setName(e.target.value)}
         enterKeyHint="done"
-        placeholder={tr("addPlaceholder")}
+        placeholder={tr(store === "hardware" ? "addPlaceholderHardware" : "addPlaceholder")}
         aria-label={tr("itemName")}
         className="h-11 min-w-0 flex-1 bg-transparent px-3 text-fg outline-none placeholder:text-muted"
       />

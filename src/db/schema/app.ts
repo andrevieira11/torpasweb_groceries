@@ -98,6 +98,8 @@ export const items = pgTable(
     section: text("section"), // optional collapsible group within a list, e.g. "Family lunch"
     nameEn: text("name_en"), // translations shown per UI language (2026-11-12)
     namePt: text("name_pt"),
+    /** Which shop: "grocery" (supermarket), "hardware" (Leroy Merlin) or "both" — one row on both tabs (2026-11-19). */
+    store: text("store").notNull().default("grocery"),
     checked: boolean("checked").notNull().default(false),
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -187,6 +189,21 @@ export const categorizeRules = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("categorize_rules_owner_norm_idx").on(t.ownerId, t.normalizedName)],
+);
+
+/** Learned shop: a user moving an item to another shop teaches where it goes next time. */
+export const storeRules = pgTable(
+  "store_rules",
+  {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    normalizedName: text("normalized_name").notNull(),
+    store: text("store").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("store_rules_owner_norm_idx").on(t.ownerId, t.normalizedName)],
 );
 
 /** Machine-translation memory for item names (normalized key → EN + PT). */

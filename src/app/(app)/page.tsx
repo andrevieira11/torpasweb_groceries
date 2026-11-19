@@ -16,7 +16,8 @@ import { ListMenu } from "@/components/ListMenu";
 import { BoardProvider } from "@/components/board/BoardProvider";
 import { ListBoard } from "@/components/board/ListBoard";
 import { getLang } from "@/lib/i18n/server";
-import { itemNames, listLabel, TIPS_COOKIE, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
+import { itemNames, listLabel, STORE_COOKIE, TIPS_COOKIE, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
+import { isStore, type StoreTab } from "@/lib/parse/store";
 import { fillMissingTranslations } from "@/lib/i18n/backfill";
 import type { Board } from "@/lib/items/board";
 
@@ -29,6 +30,7 @@ export default async function ListPage() {
   const jar = await cookies();
   const view: View = jar.get(VIEW_COOKIE)?.value === "dish" ? "dish" : "aisle";
   const tips = jar.get(TIPS_COOKIE)?.value !== "off";
+  const store: StoreTab = jar.get(STORE_COOKIE)?.value === "hardware" ? "hardware" : "grocery";
   const [userLists, rawRows, tokens, rawDishes, people] = await Promise.all([
     getUserLists(session.user.id),
     getListItems(active.id),
@@ -61,6 +63,7 @@ export default async function ListPage() {
       unit: r.unit,
       categoryKey: r.categoryKey,
       checked: r.checked,
+      store: isStore(r.store) ? r.store : "grocery",
     })),
     dishes: dishes.map((d) => ({ id: d.id, name: d.name, emoji: d.emoji })),
   };
@@ -73,6 +76,7 @@ export default async function ListPage() {
       board={board}
       recipes={recipes.map((r) => ({ ...r, mine: r.ownerId === session.user.id }))}
       initialView={view}
+      initialStore={store}
       initialTips={tips}
     >
       <section className="flex flex-col gap-4">

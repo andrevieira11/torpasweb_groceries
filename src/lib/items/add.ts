@@ -129,6 +129,7 @@ export async function applyPrepared(
             qty: i.qty,
             unit: i.unit,
             categoryKey: i.categoryKey,
+            store: i.store ?? "grocery",
             section,
             // Rows of one batch share created_at; keep the order they were typed in.
             sortOrder: n,

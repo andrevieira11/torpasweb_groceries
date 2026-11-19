@@ -1,4 +1,5 @@
 import { mergeQuantities } from "@/lib/quantity";
+import type { Store } from "@/lib/parse/store";
 
 /** An item to add to a list, with its category already decided. */
 export type IncomingItem = {
@@ -9,6 +10,8 @@ export type IncomingItem = {
   qty: number | null;
   unit: string | null;
   categoryKey: string;
+  /** Which shop; the supermarket when not said. */
+  store?: Store;
 };
 
 export type ExistingItem = {

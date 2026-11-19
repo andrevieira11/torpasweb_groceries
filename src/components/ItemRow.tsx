@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
-import { Check, CircleMinus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Check, CircleMinus, Hammer, MoreHorizontal, Pencil, ShoppingCart, Trash2 } from "lucide-react";
+import type { Store } from "@/lib/parse/store";
 import { CATEGORIES } from "@/lib/categories";
 import { displayQuantity, formatQuantity } from "@/lib/quantity";
 import { dishDisplay } from "@/lib/items/dish-emoji";
@@ -25,7 +26,7 @@ const SWIPE_REMOVE_PX = 96;
 export function ItemRow({ item, removable = false }: { item: ItemView; removable?: boolean }) {
   const tr = useT();
   const lang = useLang();
-  const { board, removeItem, toggleItem, moveItem, editItem, setItemDish } = useBoard();
+  const { board, removeItem, toggleItem, moveItem, editItem, setItemDish, setItemStore, store: tab } = useBoard();
   const checked = item.checked;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -174,6 +175,7 @@ export function ItemRow({ item, removable = false }: { item: ItemView; removable
               )}
             </span>
             {qty && <span className="shrink-0 text-xs font-medium text-muted">{qty}</span>}
+            {item.store === "both" && <BothTag />}
             {item.showDish && item.dish && <DishTag name={item.dish} />}
           </button>
 
@@ -250,7 +252,7 @@ export function ItemRow({ item, removable = false }: { item: ItemView; removable
                 </div>
               )}
 
-              {board.dishes.length > 0 && (
+              {board.dishes.length > 0 && tab === "grocery" && (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold text-muted">{tr("dish")}</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -276,6 +278,30 @@ export function ItemRow({ item, removable = false }: { item: ItemView; removable
                   </div>
                 </div>
               )}
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-muted">{tr("shop")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHOPS.map(({ store, label, icons }) => {
+                    const current = (item.store ?? "grocery") === store;
+                    return (
+                      <button
+                        key={store}
+                        type="button"
+                        onClick={() => !current && setItemStore(item, store)}
+                        aria-pressed={current}
+                        className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                          current ? "border-brand bg-brand/10 font-semibold text-fg" : "border-hairline font-medium text-muted hover:bg-surface-2"
+                        }`}
+                      >
+                        {current && <Check className="size-3.5" strokeWidth={2.6} aria-hidden />}
+                        {icons}
+                        {tr(label)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold text-muted">{tr("aisle")}</span>
@@ -307,6 +333,31 @@ export function ItemRow({ item, removable = false }: { item: ItemView; removable
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+const SHOPS: { store: Store; label: "storeGrocery" | "storeHardware" | "storeBoth"; icons: React.ReactNode }[] = [
+  { store: "grocery", label: "storeGrocery", icons: <ShoppingCart className="size-3.5" aria-hidden /> },
+  { store: "hardware", label: "storeHardware", icons: <Hammer className="size-3.5" aria-hidden /> },
+  {
+    store: "both",
+    label: "storeBoth",
+    icons: (
+      <span className="flex items-center" aria-hidden>
+        <ShoppingCart className="size-3.5" />+<Hammer className="size-3.5" />
+      </span>
+    ),
+  },
+];
+
+/** On both shop lists (one row: ticking it here ticks it there): 🛒+🔨, the words for screen readers. */
+function BothTag() {
+  const tr = useT();
+  return (
+    <span title={tr("onBothLists")} className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted">
+      <ShoppingCart className="size-3" aria-hidden />+<Hammer className="size-3" aria-hidden />
+      <span className="sr-only">{tr("onBothLists")}</span>
+    </span>
   );
 }
 

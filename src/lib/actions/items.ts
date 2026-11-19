@@ -4,7 +4,7 @@ import { z } from "zod";
 import { and, asc, eq, inArray, notExists } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { categorizeRules, items, listDishes } from "@/db/schema";
+import { categorizeRules, items, listDishes, storeRules } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { getAccessibleList } from "@/lib/queries/lists";
 import { ingestText } from "@/lib/items/ingest";
@@ -15,6 +15,7 @@ import { dishSnapshot, itemSnapshot, removalToken, sectionDishIds } from "@/lib/
 import { MAX_ADD } from "@/lib/items/board";
 import { CLIENT_ID_RE } from "@/lib/ids";
 import { getLang } from "@/lib/i18n/server";
+import { STORES, type Store } from "@/lib/parse/store";
 
 async function requireUser() {
   const session = await getSession();
@@ -44,6 +45,8 @@ const addSchema = z.object({
   listId: z.string().min(1),
   text: z.string().min(1).max(2000),
   ids: z.array(z.string().regex(CLIENT_ID_RE)).max(MAX_ADD).optional(),
+  /** The shop tab it was typed on. */
+  store: z.enum(["grocery", "hardware"]).optional(),
 });
 
 /**
@@ -52,12 +55,12 @@ const addSchema = z.object({
  * by the Siri webhook).
  */
 export async function addItems(input: z.infer<typeof addSchema>) {
-  const { listId, text, ids } = addSchema.parse(input);
+  const { listId, text, ids, store } = addSchema.parse(input);
   const user = await requireUser();
   const list = await getAccessibleList(user.id, listId);
   if (!list) throw new Error("List not found");
 
-  const result = await ingestText({ list, text, addedByUserId: user.id, lang: await getLang(), ids });
+  const result = await ingestText({ list, text, addedByUserId: user.id, lang: await getLang(), ids, store });
   revalidatePath("/");
   return result;
 }
@@ -107,6 +110,27 @@ export async function moveItem(input: { itemId: string; categoryKey: string }) {
       set: { categoryKey },
     });
 
+  revalidatePath("/");
+  return { ok: true as const };
+}
+
+/**
+ * Move an item to the supermarket, Leroy Merlin or both (still one row: ticking it off on one
+ * tab ticks it off on the other). Learned for the owner, like an aisle move.
+ */
+export async function setItemStore(input: { itemId: string; store: Store }) {
+  const { itemId, store } = z
+    .object({ itemId: z.string().min(1), store: z.enum(STORES as [Store, ...Store[]]) })
+    .parse(input);
+  const user = await requireUser();
+  const found = await itemIfThere(user.id, itemId);
+  if (!found) return gone();
+  const { item, list } = found;
+  await db.update(items).set({ store, updatedAt: new Date() }).where(eq(items.id, itemId));
+  await db
+    .insert(storeRules)
+    .values({ ownerId: list.ownerId, normalizedName: item.normalizedName, store })
+    .onConflictDoUpdate({ target: [storeRules.ownerId, storeRules.normalizedName], set: { store } });
   revalidatePath("/");
   return { ok: true as const };
 }

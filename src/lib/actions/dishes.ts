@@ -15,6 +15,8 @@ import { MAX_ADD } from "@/lib/items/board";
 import { CLIENT_ID_RE } from "@/lib/ids";
 import { getLang } from "@/lib/i18n/server";
 import { categorize, cleanDisplayName, normalizeName, parseInput } from "@/lib/parse";
+import { pickStore } from "@/lib/parse/store";
+import { learnedStores } from "@/lib/items/store-rules";
 
 /**
  * Dishes = named sections of a list (items.section) + their list_dishes row. Every action is
@@ -62,10 +64,10 @@ const text = z.string().max(2000);
 async function prepareText(list: { ownerId: string }, input: string, rowIds: string[] | undefined) {
   const parsed = parseInput(input).slice(0, MAX_ADD);
   if (parsed.length === 0) return null;
-  const rules = await db
-    .select()
-    .from(categorizeRules)
-    .where(eq(categorizeRules.ownerId, list.ownerId));
+  const [rules, shops] = await Promise.all([
+    db.select().from(categorizeRules).where(eq(categorizeRules.ownerId, list.ownerId)),
+    learnedStores(list.ownerId),
+  ]);
   const learned = new Map(rules.map((r) => [r.normalizedName, r.categoryKey]));
   return prepareItems(
     parsed.map((p, n) => ({
@@ -75,6 +77,7 @@ async function prepareText(list: { ownerId: string }, input: string, rowIds: str
       qty: p.qty,
       unit: p.unit,
       categoryKey: categorize(p.name, learned),
+      store: pickStore(p.name, "grocery", shops), // dishes are cooking: the supermarket unless the name says
     })),
     await getLang(),
   );

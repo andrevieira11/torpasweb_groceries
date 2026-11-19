@@ -5,6 +5,8 @@ export type Lang = "en" | "pt";
 export const LANG_COOKIE = "mrlist-lang";
 export const VIEW_COOKIE = "mrlist-view";
 export const TIPS_COOKIE = "mrlist-tips";
+/** The shop tab you were on (supermarket / Leroy Merlin). */
+export const STORE_COOKIE = "mrlist-store";
 export type View = "aisle" | "dish";
 export const DEFAULT_LANG: Lang = "pt";
 
@@ -14,6 +16,21 @@ export function asLang(v: string | undefined | null): Lang {
 
 const S = {
   addPlaceholder: { en: "Add item — milk, eggs…", pt: "Adicionar — leite, ovos…" },
+  addPlaceholderHardware: { en: "Add for Leroy — screws, tape…", pt: "Juntar p/ o Leroy — parafusos, fita…" },
+  whichShop: { en: "Which shop", pt: "Que loja" },
+  shop: { en: "Shop", pt: "Loja" },
+  storeGrocery: { en: "Supermarket", pt: "Supermercado" },
+  storeHardware: { en: "Leroy Merlin", pt: "Leroy Merlin" },
+  storeBoth: { en: "Both", pt: "Os dois" },
+  onBothLists: { en: "On both lists", pt: "Nas duas listas" },
+  wentToStore: { en: "“{name}” went to: {store}", pt: "“{name}” foi para: {store}" },
+  wentToStoreMany: { en: "{n} things went to: {store}", pt: "{n} coisas foram para: {store}" },
+  show: { en: "Show", pt: "Ver" },
+  noHardware: { en: "Nothing for Leroy Merlin yet", pt: "Nada para o Leroy Merlin" },
+  noHardwareBody: {
+    en: "Type it above — screws, a ladder, duct tape. Things both shops sell show on both lists.",
+    pt: "Escreve em cima — parafusos, uma escada, fita adesiva. O que as duas lojas vendem aparece nas duas listas.",
+  },
   itemName: { en: "Item name", pt: "Nome do produto" },
   quantity: { en: "Quantity", pt: "Quantidade" },
   addByVoice: { en: "Add by voice", pt: "Adicionar por voz" },

@@ -24,8 +24,10 @@ import {
   editItem as editItemAction,
   moveItem as moveItemAction,
   setItemDish as setItemDishAction,
+  setItemStore as setItemStoreAction,
   toggleItem as toggleItemAction,
 } from "@/lib/actions/items";
+import { onTab, type Store, type StoreTab } from "@/lib/parse/store";
 import {
   addToDish as addToDishAction,
   createDish as createDishAction,
@@ -35,7 +37,7 @@ import {
   restoreRemoved,
   saveDishAsRecipe,
 } from "@/lib/actions/dishes";
-import { fill, removalMessage, TIPS_COOKIE, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
+import { fill, removalMessage, STORE_COOKIE, TIPS_COOKIE, VIEW_COOKIE, type View } from "@/lib/i18n/strings";
 import { useToast } from "../Toast";
 import { useLang, useT } from "../LangProvider";
 
@@ -51,6 +53,10 @@ type BoardApi = {
   recipes: RecipeLite[];
   view: View;
   setView: (v: View) => void;
+  /** The shop tab: the supermarket or Leroy Merlin ("both" items show on each). */
+  store: StoreTab;
+  setStore: (s: StoreTab) => void;
+  setItemStore: (item: BoardItem, store: Store) => void;
   /** Show the one-line view tips (until hidden, or after a few view switches). */
   tips: boolean;
   hideTips: () => void;
@@ -129,6 +135,7 @@ export function BoardProvider({
   board: server,
   recipes,
   initialView,
+  initialStore = "grocery",
   initialTips,
   children,
 }: {
@@ -137,6 +144,7 @@ export function BoardProvider({
   board: Board;
   recipes: RecipeLite[];
   initialView: View;
+  initialStore?: StoreTab;
   initialTips: boolean;
   children: React.ReactNode;
 }) {
@@ -147,6 +155,7 @@ export function BoardProvider({
   const [board, apply] = useOptimistic(server, applyOp);
   const [, start] = useTransition();
   const [view, setViewState] = useState<View>(initialView);
+  const [store, setStoreState] = useState<StoreTab>(initialStore);
   const [tips, setTips] = useState(initialTips);
   const [glow, setGlow] = useState<string | null>(null);
   const undoBatch = useRef<UndoEntry[]>([]);
@@ -172,6 +181,26 @@ export function BoardProvider({
     }
     setViewState(v);
     rememberView(v);
+  }
+
+  function setStore(s: StoreTab) {
+    setStoreState(s);
+    document.cookie = `${STORE_COOKIE}=${s}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  /** Something typed on one tab that belongs to the other shop: say where it went, with a way there. */
+  function saySentElsewhere(inserts: BoardItem[]) {
+    const away = inserts.filter((i) => !onTab(i.store, store));
+    if (away.length === 0) return;
+    const other: StoreTab = store === "grocery" ? "hardware" : "grocery";
+    const name = tr(other === "hardware" ? "storeHardware" : "storeGrocery");
+    toast({
+      message:
+        away.length === 1
+          ? fill(tr("wentToStore"), { name: away[0].name, store: name })
+          : fill(tr("wentToStoreMany"), { n: away.length, store: name }),
+      action: { label: tr("show"), icon: "open", run: () => setStore(other) },
+    });
   }
 
   /** Apply ops optimistically and run the action; returns its promise (for Undo tokens). */
@@ -267,13 +296,14 @@ export function BoardProvider({
         recipes.filter((r) => r.ownerId === listOwnerId).map((r) => ({ ...r, normalizedName: normalizeName(r.name) })),
       );
     if (chunks.length === 1 && !chunks[0].section && !recipe) {
-      const plan = planAdd(board, null, text, newId);
+      const plan = planAdd(board, null, text, newId, store);
       if (plan.ids.length === 0) return;
       run([{ kind: "add", inserts: plan.inserts, updates: plan.updates }], () =>
-        addItems({ listId, text, ids: plan.ids }),
+        addItems({ listId, text, ids: plan.ids, store }),
       );
+      saySentElsewhere(plan.inserts);
     } else {
-      run([], () => addItems({ listId, text }));
+      run([], () => addItems({ listId, text, store }));
     }
   }
 
@@ -435,6 +465,10 @@ export function BoardProvider({
     run([{ kind: "patch", id: item.id, patch: { categoryKey } }], () => moveItemAction({ itemId: item.id, categoryKey }), itemGone);
   }
 
+  function setItemStore(item: BoardItem, to: Store) {
+    run([{ kind: "patch", id: item.id, patch: { store: to } }], () => setItemStoreAction({ itemId: item.id, store: to }), itemGone);
+  }
+
   function editItem(item: BoardItem, text: string) {
     const [p] = parseInput(text);
     if (!p) return;
@@ -465,6 +499,9 @@ export function BoardProvider({
         recipes,
         view,
         setView,
+        store,
+        setStore,
+        setItemStore,
         tips,
         hideTips,
         glow,

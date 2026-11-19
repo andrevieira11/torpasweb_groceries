@@ -13,6 +13,8 @@ import { cleanDisplayName, normalizeName } from "@/lib/parse";
 import { CATEGORY_KEYS } from "@/lib/categories";
 import { getLang } from "@/lib/i18n/server";
 import { clampPeople, scaleQuantity } from "@/lib/recipes/scale";
+import { pickStore } from "@/lib/parse/store";
+import { learnedStores } from "@/lib/items/store-rules";
 
 async function requireUser() {
   const session = await getSession();
@@ -134,13 +136,14 @@ export async function addRecipeAsDish(input: { recipeId: string; people?: number
   if (!recipe) throw new Error("Recipe not found");
 
   const list = await getActiveList(user.id);
-  const [ings, dishes] = await Promise.all([
+  const [ings, dishes, shops] = await Promise.all([
     db
       .select()
       .from(recipeIngredients)
       .where(eq(recipeIngredients.recipeId, recipeId))
       .orderBy(asc(recipeIngredients.sortOrder)),
     db.select({ name: listDishes.name }).from(listDishes).where(eq(listDishes.listId, list.id)),
+    learnedStores(list.ownerId),
   ]);
   const dish = canonicalDish(recipe.name, dishes.map((d) => d.name)) ?? "Recipe";
   const people = asked == null ? recipe.servings : clampPeople(asked);
@@ -152,6 +155,7 @@ export async function addRecipeAsDish(input: { recipeId: string; people?: number
       normalizedName: g.normalizedName,
       ...scaleQuantity({ qty: g.qty, unit: g.unit }, recipe.servings, people),
       categoryKey: g.categoryKey,
+      store: pickStore(g.name, "grocery", shops),
     })),
     user.id,
     null,

@@ -5,6 +5,7 @@ import { normalizeName } from "@/lib/parse/normalize";
 import { dictionaryAliases } from "@/lib/i18n/pairs";
 import { planMerge } from "./merge-plan";
 import { sameDish } from "./sections";
+import { pickStore, type Store, type StoreTab } from "@/lib/parse/store";
 
 /**
  * The list page's client model: every item (flat) plus the list's dishes. Both views are pure
@@ -24,6 +25,8 @@ export type BoardItem = {
   unit: string | null;
   categoryKey: string;
   checked: boolean;
+  /** Supermarket, Leroy Merlin or both (the supermarket when not said). */
+  store?: Store;
   pending?: boolean; // shown optimistically, not saved yet
 };
 export type BoardDish = { id: string; name: string; emoji: string | null; pending?: boolean };
@@ -111,6 +114,8 @@ export function planAdd(
   dish: string | null,
   text: string,
   makeId: () => string,
+  /** The shop tab it is typed on; the name can still say otherwise (the server also knows learned shops). */
+  here: StoreTab = "grocery",
 ): { ids: string[]; inserts: BoardItem[]; updates: QtyUpdate[] } {
   const parsed = parseInput(text).slice(0, MAX_ADD);
   const ids = parsed.map(() => makeId());
@@ -128,6 +133,7 @@ export function planAdd(
       qty: p.qty,
       unit: p.unit,
       categoryKey: categorize(p.name),
+      store: pickStore(p.name, here),
     })),
     existing,
   );
@@ -143,6 +149,7 @@ export function planAdd(
       qty: i.qty,
       unit: i.unit,
       categoryKey: i.categoryKey,
+      store: i.store,
       checked: false,
     })),
   };

@@ -7,6 +7,8 @@ import { parseInput, categorize, stripCommandPrefix } from "@/lib/parse";
 import { matchRecipe } from "@/lib/recipes/match";
 import { applyItems } from "./add";
 import { canonicalDish, splitSections } from "./sections";
+import { learnedStores } from "./store-rules";
+import { pickStore, type StoreTab } from "@/lib/parse/store";
 import type { Lang } from "@/lib/i18n/strings";
 
 const MAX_ITEMS = 50;
@@ -39,6 +41,8 @@ export async function ingestText(opts: {
    * (one line, no "Name:", not a recipe), the one case the browser can predict.
    */
   ids?: string[];
+  /** The shop tab it was typed on (Siri: the supermarket); an item's name can still say otherwise. */
+  store?: StoreTab;
 }): Promise<IngestResult> {
   const chunks = splitSections(opts.text);
   // File "lunch:" under an existing "Lunch" dish instead of starting a near-duplicate.
@@ -76,18 +80,20 @@ async function ingestOne(opts: {
   section: string | null;
   lang?: Lang;
   ids?: string[];
+  store?: StoreTab;
 }): Promise<IngestResult> {
   const { list, text, addedByUserId, section, lang, ids } = opts;
+  const here = opts.store ?? "grocery";
   const addedByName = opts.addedByName ?? null;
 
   const phrase = stripCommandPrefix(text.trim());
   if (phrase && !/[,\n;]/.test(phrase)) {
     const hit = matchRecipe(phrase, await getRecipeRefs(list.ownerId));
     if (hit) {
-      const ings = await db
-        .select()
-        .from(recipeIngredients)
-        .where(eq(recipeIngredients.recipeId, hit.id));
+      const [ings, shops] = await Promise.all([
+        db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, hit.id)),
+        learnedStores(list.ownerId),
+      ]);
       const res = await applyItems(
         list.id,
         ings.map((g) => ({
@@ -96,6 +102,7 @@ async function ingestOne(opts: {
           qty: g.qty,
           unit: g.unit,
           categoryKey: g.categoryKey,
+          store: pickStore(g.name, "grocery", shops), // a recipe is food, whichever tab
         })),
         addedByUserId,
         addedByName,
@@ -109,10 +116,10 @@ async function ingestOne(opts: {
   const parsed = parseInput(text).slice(0, MAX_ITEMS);
   if (parsed.length === 0) return { kind: "items", added: 0, merged: 0, names: [] };
 
-  const rules = await db
-    .select()
-    .from(categorizeRules)
-    .where(eq(categorizeRules.ownerId, list.ownerId));
+  const [rules, shops] = await Promise.all([
+    db.select().from(categorizeRules).where(eq(categorizeRules.ownerId, list.ownerId)),
+    learnedStores(list.ownerId),
+  ]);
   const learned = new Map(rules.map((r) => [r.normalizedName, r.categoryKey]));
 
   const res = await applyItems(
@@ -124,6 +131,7 @@ async function ingestOne(opts: {
       qty: p.qty,
       unit: p.unit,
       categoryKey: categorize(p.name, learned),
+      store: pickStore(p.name, here, shops),
     })),
     addedByUserId,
     addedByName,

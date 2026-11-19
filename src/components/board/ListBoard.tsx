@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ListMinus, Plus, ShoppingBasket, X } from "lucide-react";
+import { Hammer, ListMinus, Plus, ShoppingBasket, ShoppingCart, X } from "lucide-react";
 import { byAisle, dishView, type BoardDish, type BoardItem } from "@/lib/items/board";
+import { onTab, type StoreTab } from "@/lib/parse/store";
 import { getCategory } from "@/lib/categories";
 import { categoryLabel, fill, type View } from "@/lib/i18n/strings";
 import { CategoryGroup } from "../CategoryGroup";
@@ -21,14 +22,17 @@ import { NewDishSheet } from "./NewDishSheet";
  */
 export function ListBoard() {
   const tr = useT();
-  const { board, view, setView, tips, hideTips } = useBoard();
+  const { board: all, view, setView, tips, hideTips, store, setStore } = useBoard();
+  // The shop tab shows its own items plus the "both" ones (the same rows — a tick shows on both).
+  const board = { ...all, items: all.items.filter((i) => onTab(i.store, store)) };
+  const hardware = store === "hardware";
   const [newDish, setNewDish] = useState(0); // >0 = open; bumps give each opening a fresh form
   const [newOpen, setNewOpen] = useState(false);
   const [menu, setMenu] = useState<{ dish: BoardDish; open: boolean; key: number } | null>(null);
 
-  const hasDishes = board.dishes.length > 0 || board.items.some((i) => i.dish);
+  const hasDishes = !hardware && (board.dishes.length > 0 || board.items.some((i) => i.dish));
   const shown: View = hasDishes ? view : "aisle";
-  const empty = board.items.length === 0 && board.dishes.length === 0;
+  const empty = board.items.length === 0 && (hardware || board.dishes.length === 0);
   const sheetOpen = newOpen || !!menu?.open;
 
   function openNewDish() {
@@ -38,6 +42,11 @@ export function ListBoard() {
 
   return (
     <>
+      <StoreTabs store={store} onChange={setStore} counts={{
+        grocery: all.items.filter((i) => !i.checked && onTab(i.store, "grocery")).length,
+        hardware: all.items.filter((i) => !i.checked && onTab(i.store, "hardware")).length,
+      }} />
+
       {hasDishes ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
@@ -61,7 +70,7 @@ export function ListBoard() {
           )}
         </div>
       ) : (
-        !empty && (
+        !empty && !hardware && (
           <div className="flex items-center gap-3 rounded-2xl border border-dashed border-hairline px-2 py-1.5">
             <NewDishButton onClick={openNewDish} />
             <p className="min-w-0 flex-1 text-xs text-muted">{tr("dishTip")}</p>
@@ -70,11 +79,12 @@ export function ListBoard() {
       )}
 
       {empty ? (
-        <EmptyState onNewDish={openNewDish} />
+        hardware ? <HardwareEmpty /> : <EmptyState onNewDish={openNewDish} />
       ) : shown === "aisle" ? (
         <AisleView items={board.items} />
       ) : (
         <DishesView
+          items={board.items}
           onNewDish={openNewDish}
           onMenu={(id) => {
             const dish = board.dishes.find((d) => d.id === id);
@@ -95,6 +105,48 @@ export function ListBoard() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * 🛒 Supermarket | 🔨 Leroy Merlin, with how many things are left to buy on each. Icon + word +
+ * number, never colour alone.
+ */
+function StoreTabs({ store, onChange, counts }: { store: StoreTab; onChange: (s: StoreTab) => void; counts: Record<StoreTab, number> }) {
+  const tr = useT();
+  const btn = (s: StoreTab, Icon: typeof ShoppingCart, label: string) => (
+    <button
+      type="button"
+      role="tab"
+      onClick={() => onChange(s)}
+      aria-selected={store === s}
+      className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-[14px] font-semibold transition-colors ${
+        store === s ? "bg-surface text-fg shadow-sm ring-1 ring-hairline" : "text-muted hover:text-fg"
+      }`}
+    >
+      <Icon className="size-[18px] shrink-0" strokeWidth={2.4} aria-hidden />
+      <span className="truncate">{label}</span>
+      <span className={`num shrink-0 rounded-full px-1.5 text-[12px] ${store === s ? "bg-surface-2" : ""}`}>{counts[s]}</span>
+    </button>
+  );
+  return (
+    <div role="tablist" aria-label={tr("whichShop")} className="flex gap-1 rounded-2xl bg-surface-2 p-1">
+      {btn("grocery", ShoppingCart, tr("storeGrocery"))}
+      {btn("hardware", Hammer, tr("storeHardware"))}
+    </div>
+  );
+}
+
+function HardwareEmpty() {
+  const tr = useT();
+  return (
+    <div className="mt-2 flex flex-col items-center gap-3 rounded-3xl border border-hairline bg-surface px-6 py-12 text-center">
+      <div className="grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted">
+        <Hammer className="size-7" />
+      </div>
+      <p className="text-base font-medium">{tr("noHardware")}</p>
+      <p className="max-w-[19rem] text-sm text-muted">{tr("noHardwareBody")}</p>
+    </div>
   );
 }
 
@@ -215,10 +267,10 @@ function AisleView({ items }: { items: BoardItem[] }) {
   );
 }
 
-function DishesView({ onNewDish, onMenu }: { onNewDish: () => void; onMenu: (id: string) => void }) {
+function DishesView({ items, onNewDish, onMenu }: { items: BoardItem[]; onNewDish: () => void; onMenu: (id: string) => void }) {
   const tr = useT();
   const { board } = useBoard();
-  const { loose, dishes } = dishView(board);
+  const { loose, dishes } = dishView({ ...board, items }); // this shop tab's items only
   return (
     <div className="flex flex-col gap-3">
       <AnimatePresence initial={false}>
